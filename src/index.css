@@ -1,0 +1,266 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-krem text-tinta font-body;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+}
+
+@layer components {
+  /* Angka tabular — dipakai untuk pembacaan sensor & nominal */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* Kartu dasar (port dari prototype .card) */
+  .card {
+    @apply bg-permukaan border border-border rounded-lg shadow-1;
+  }
+  .card-hd {
+    @apply flex items-center justify-between px-[22px] py-[18px] border-b border-border;
+  }
+
+  /* Tombol */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-transparent
+      font-semibold cursor-pointer transition-colors;
+    font-family: inherit;
+  }
+  .btn-primary {
+    @apply bg-amber-tombol text-white shadow-1;
+  }
+  .btn-primary:hover {
+    background: #98480f;
+  }
+  .btn-outline {
+    @apply bg-transparent text-tinta border-border-kuat;
+  }
+  .btn-outline:hover {
+    @apply border-amber-teks text-amber-teks;
+  }
+  .btn-lg {
+    @apply text-base;
+    padding: 14px 26px;
+  }
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(217, 100, 30, 0.32);
+  }
+
+  /* Wrapper lebar konten landing (port .wrap) */
+  .wrap {
+    @apply mx-auto;
+    max-width: 1180px;
+    padding: 0 40px;
+  }
+  @media (max-width: 860px) {
+    .wrap {
+      padding: 0 24px;
+    }
+  }
+
+  /* Eyebrow label (port .eyebrow landing) */
+  .eyebrow {
+    @apply inline-flex items-center gap-[10px] text-[12px] font-semibold uppercase text-amber-teks;
+    letter-spacing: 0.16em;
+  }
+  .eyebrow::before {
+    content: '';
+    @apply w-6 bg-amber inline-block;
+    height: 1.5px;
+  }
+
+  /* Titik live berdenyut (port .live) */
+  .live-dot {
+    @apply w-[7px] h-[7px] rounded-full bg-normal inline-block;
+    animation: amor-pulse 2.4s infinite;
+  }
+}
+
+@keyframes amor-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 122, 74, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(79, 122, 74, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 122, 74, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+@layer components {
+  /* Input form (port prototype Login) */
+  .field-input {
+    @apply w-full bg-permukaan border border-border-kuat rounded-md text-[15px] text-tinta transition-colors;
+    padding: 12px 14px 12px 42px;
+  }
+  .field-input::placeholder {
+    @apply text-tinta-40;
+  }
+  .field-input:focus {
+    @apply outline-none border-amber-teks;
+    box-shadow: 0 0 0 3px rgba(217, 100, 30, 0.16);
+  }
+
+  /* Shake animasi field error (port .field.shake) */
+  .shake {
+    animation: amor-shake 0.35s;
+  }
+
+  /* Badge status (port dari prototype) */
+  .badge {
+    @apply inline-flex items-center gap-[7px] rounded-full text-[13px] font-semibold border border-transparent;
+    padding: 5px 11px 5px 9px;
+  }
+  .badge .pip {
+    @apply w-[7px] h-[7px] rounded-full;
+  }
+  .b-normal {
+    @apply bg-normal-bg text-normal-teks;
+    border-color: #cfe0c8;
+  }
+  .b-normal .pip {
+    @apply bg-normal;
+  }
+  .b-warning {
+    @apply bg-warning-bg text-warning-teks;
+    border-color: #ecd7a6;
+  }
+  .b-warning .pip {
+    @apply bg-warning;
+  }
+  .b-critical {
+    @apply bg-critical-bg text-critical-teks;
+    border-color: #ecc4bd;
+  }
+  .b-critical .pip {
+    @apply bg-critical;
+  }
+}
+
+@keyframes amor-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+@layer components {
+  /* Tombol varian tambahan (Anggota/Penjualan) */
+  .btn-ghost {
+    @apply bg-transparent text-tinta-60;
+  }
+  .btn-ghost:hover {
+    @apply bg-permukaan-2 text-tinta;
+  }
+  .btn-danger {
+    @apply bg-critical text-white;
+  }
+  .btn-danger:hover {
+    background: #97302a;
+  }
+  .btn-sm {
+    @apply text-[13px] rounded-sm;
+    padding: 8px 13px;
+  }
+
+  /* Input form modal (tanpa ikon kiri) */
+  .form-input,
+  .form-select {
+    @apply w-full bg-permukaan border border-border-kuat rounded-md text-[15px] text-tinta transition-colors;
+    padding: 11px 13px;
+  }
+  .form-input::placeholder {
+    @apply text-tinta-40;
+  }
+  .form-input:focus,
+  .form-select:focus {
+    @apply outline-none border-amber-teks;
+    box-shadow: 0 0 0 3px rgba(217, 100, 30, 0.16);
+  }
+  .form-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A857C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 13px center;
+    padding-right: 38px;
+  }
+  .form-input.invalid,
+  .field-invalid .form-input {
+    @apply border-critical;
+  }
+}
+
+/* Modal & toast */
+@keyframes amor-rise {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.modal-rise {
+  animation: amor-rise 0.22s ease;
+}
+
+/* Animasi masuk section/kartu (dipakai komponen Reveal) */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.55s ease,
+    transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hormati preferensi gerak minimal: matikan semua animasi masuk & dekoratif */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal.is-in,
+  .modal-rise {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+  .live-dot {
+    animation: none !important;
+  }
+}
