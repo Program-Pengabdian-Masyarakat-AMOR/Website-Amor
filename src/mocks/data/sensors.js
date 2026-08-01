@@ -1,35 +1,40 @@
-// sensor_logs: id, device_id, timestamp, berat_input, suhu_reaktor, gas_level,
-//              status_proses (running|idle|finished)
+// Telemetri IoT → Web (via Firebase, direlay backend). Bentuk objek:
+//   suhu_pirolisis, suhu_tungku : number (°C)
+//   berat_sampah, berat_minyak, berat_sampah_total : number (kg)
+//   status_gas : boolean (true = terdeteksi)
+//   status_sistem : "idle" | "running"
 export const sensorLatest = {
-  id: 's-latest',
-  device_id: 'ESP32-RW04-01',
   timestamp: '2026-06-13T03:42:00.000Z',
-  berat_input: 3.0,
-  suhu_reaktor: 408,
-  gas_level: 540,
-  status_proses: 'running',
+  suhu_pirolisis: 402,
+  suhu_tungku: 806,
+  berat_sampah: 3.0,
+  berat_minyak: 9.7,
+  berat_sampah_total: 15.2,
+  status_gas: false,
+  status_sistem: 'running',
 };
 
-// Tren selama sesi #128 (suhu naik, berat menyusut) untuk grafik Monitoring.
-// Bentuk tiap titik = sensor_logs; menit dihitung dari timestamp mulai.
+// Tren selama sesi berjalan (suhu naik ke target, berat sampah menyusut,
+// minyak bertambah). Dipakai grafik Monitoring.
 const mulai = Date.UTC(2026, 5, 13, 1, 28);
 const trace = [
-  { menit: 0, suhu: 60, berat: 15.2, gas: 90 },
-  { menit: 10, suhu: 150, berat: 14.4, gas: 110 },
-  { menit: 20, suhu: 250, berat: 12.6, gas: 140 },
-  { menit: 30, suhu: 322, berat: 10.2, gas: 160 },
-  { menit: 40, suhu: 360, berat: 7.8, gas: 175 },
-  { menit: 50, suhu: 378, berat: 5.4, gas: 180 },
-  { menit: 60, suhu: 384, berat: 3.9, gas: 182 },
-  { menit: 72, suhu: 388, berat: 3.0, gas: 182 },
+  { menit: 0, pir: 90, tun: 180, sampah: 15.2, minyak: 0.0, gas: true },
+  { menit: 10, pir: 210, tun: 420, sampah: 14.4, minyak: 0.6, gas: true },
+  { menit: 20, pir: 320, tun: 640, sampah: 12.6, minyak: 2.1, gas: false },
+  { menit: 30, pir: 372, tun: 742, sampah: 10.2, minyak: 3.8, gas: false },
+  { menit: 40, pir: 396, tun: 790, sampah: 7.8, minyak: 5.6, gas: false },
+  { menit: 50, pir: 404, tun: 808, sampah: 5.4, minyak: 7.4, gas: false },
+  { menit: 60, pir: 401, tun: 803, sampah: 3.9, minyak: 8.9, gas: false },
+  { menit: 72, pir: 402, tun: 806, sampah: 3.0, minyak: 9.7, gas: false },
 ];
 
-export const sensorSeries = trace.map((t, i) => ({
-  id: `s-${i}`,
-  device_id: 'ESP32-RW04-01',
+export const sensorSeries = trace.map((t) => ({
   timestamp: new Date(mulai + t.menit * 60000).toISOString(),
-  berat_input: t.berat,
-  suhu_reaktor: t.suhu,
-  gas_level: t.gas,
-  status_proses: 'running',
+  suhu_pirolisis: t.pir,
+  suhu_tungku: t.tun,
+  berat_sampah: t.sampah,
+  berat_minyak: t.minyak,
+  berat_sampah_total: 15.2,
+  status_gas: t.gas,
+  status_sistem: 'running',
 }));

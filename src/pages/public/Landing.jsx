@@ -105,7 +105,7 @@ export default function Landing() {
           <Reveal className="grid lg:grid-cols-[1.08fr_.92fr] gap-16 items-center max-[860px]:gap-10">
             <div>
               <p className="eyebrow">Pengabdian Masyarakat · Tahun ke-3</p>
-              <h1 className="font-medium text-[60px] leading-[1.02] my-6 max-[860px]:text-[44px]">
+              <h1 className="font-medium text-[60px] leading-[1.02] my-6 max-[860px]:text-[44px] max-[480px]:text-[34px]">
                 Sampah plastik, <em className="italic text-amber-teks">dipanaskan</em> jadi minyak.
               </h1>
               <p className="text-[18.5px] text-tinta-60 mb-[18px] max-w-[520px]">
@@ -221,7 +221,7 @@ export default function Landing() {
               Prosesnya runtut dan dapat diawasi di setiap tahap. Tidak ada bagian yang tersembunyi.
             </p>
           </Reveal>
-          <div className="grid grid-cols-4 max-[860px]:grid-cols-2 max-[860px]:gap-y-9">
+          <div className="grid grid-cols-4 max-[860px]:grid-cols-2 max-[860px]:gap-y-9 max-[480px]:grid-cols-1 max-[480px]:gap-y-7">
             {STEPS.map((s, i) => (
               <Reveal as="div" key={s.n} delay={i * 80} className="px-[26px] max-[860px]:px-0">
                 <div className="w-[54px] h-[54px] rounded-[14px] bg-permukaan border border-border shadow-1 grid place-items-center text-olive mb-[18px]">

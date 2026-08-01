@@ -6,7 +6,7 @@ import ChartFallback from '../../components/ChartFallback';
 import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
-import { THRESHOLDS, statusDariPelanggaran } from '../../lib/thresholds';
+import { statusSuhu, hitungAlert, statusDariAlert } from '../../lib/thresholds';
 import { formatAngka, formatJam, formatTanggal } from '../../lib/format';
 
 const LineChart = lazy(() => import('../../components/LineChart'));
@@ -41,10 +41,9 @@ const STATUS_BIG = {
 };
 
 const ICON = {
-  suhu: <path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />,
   gas: <><path d="M3 17a9 9 0 0 1 18 0" /><path d="M12 17a3 3 0 0 0 3-3c0-2-3-6-3-6s-3 4-3 6a3 3 0 0 0 3 3z" /></>,
-  durasi: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-  yield: <path d="M12 2.5C12 2.5 5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5z" />,
+  pir: <path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />,
+  tun: <path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />,
 };
 
 function sesiLabel(id) {
@@ -54,53 +53,55 @@ function sesiLabel(id) {
 export default function HealthCheck() {
   const health = useApi(() => api.get('/health-status'), []);
   const sensor = useApi(() => api.get('/sensor-data/latest'), []);
-  const produksi = useApi(() => api.get('/production-logs'), []);
   const prediksi = useApi(() => api.get('/predictions'), []);
+  const kontrol = useApi(() => api.get('/control'), []);
 
   const latest = sensor.data?.latest;
-  const sesi = produksi.data?.[0];
+  const sp = kontrol.data;
 
-  // Parameter pemicu (rule-based) — dihitung dari sensor terkini + sesi terbaru.
+  function paramSuhu(key, label, nilai, band) {
+    const st = statusSuhu(nilai, band);
+    const violated = st !== 'aman';
+    const catatan =
+      st === 'rendah'
+        ? 'di bawah target — pembakaran belum optimal & gas berpotensi naik'
+        : st === 'tinggi'
+          ? 'melewati batas atas — risiko overheat'
+          : 'berada di pita target';
+    return {
+      key,
+      nama: `Suhu ${label}`,
+      desc: band ? `Target ${band.bawah}–${band.atas} °C · ${catatan}.` : catatan,
+      valLabel: 'saat ini',
+      val: `${formatAngka(nilai)} °C`,
+      violated,
+      severity: 'warning', // suhu hanya memicu peringatan, tak pernah menghentikan proses
+    };
+  }
+
+  // Parameter pemicu (rule-based) — dari telemetri terkini terhadap setpoint kontrol.
   const params =
-    latest && sesi
+    latest && sp
       ? [
           {
-            key: 'suhu',
-            nama: 'Suhu reaktor melebihi batas aman',
-            desc: `Suhu puncak sesi ${formatAngka(sesi.suhu_max)} °C terhadap ambang aman ${THRESHOLDS.suhuMaxAman} °C.`,
-            valLabel: 'saat ini',
-            val: `${formatAngka(latest.suhu_reaktor)} °C`,
-            violated: sesi.suhu_max > THRESHOLDS.suhuMaxAman,
-          },
-          {
             key: 'gas',
-            nama: 'Terdeteksi indikasi kebocoran gas',
-            desc: `Level gas (MQ-2) terhadap ambang aman ${THRESHOLDS.gasLevelAman} ppm.`,
-            valLabel: 'saat ini',
-            val: `${formatAngka(latest.gas_level)} ppm`,
-            violated: latest.gas_level > THRESHOLDS.gasLevelAman,
+            nama: 'Gas mudah terbakar terdeteksi',
+            desc: 'Sensor MQ-2. Karena pembakaran makin sempurna saat suhu tinggi, gas biasanya muncul ketika suhu di bawah target.',
+            valLabel: 'status',
+            val: latest.status_gas ? 'Terdeteksi' : 'Aman',
+            violated: latest.status_gas === true,
+            severity: 'critical',
           },
-          {
-            key: 'durasi',
-            nama: 'Durasi proses di luar rentang normal',
-            desc: `Rentang wajar ${THRESHOLDS.durasiMin}–${THRESHOLDS.durasiMaks} menit.`,
-            valLabel: 'durasi',
-            val: `${formatAngka(sesi.durasi_menit)} mnt`,
-            violated: sesi.durasi_menit < THRESHOLDS.durasiMin || sesi.durasi_menit > THRESHOLDS.durasiMaks,
-          },
-          {
-            key: 'yield',
-            nama: 'Yield di bawah ambang normal',
-            desc: `Ambang minimum yield ${THRESHOLDS.yieldMin}%.`,
-            valLabel: 'sementara',
-            val: `${formatAngka(sesi.yield_percent)} %`,
-            violated: sesi.yield_percent < THRESHOLDS.yieldMin,
-          },
+          paramSuhu('pir', 'pirolisis (reaktor)', latest.suhu_pirolisis, sp.pirolisis),
+          paramSuhu('tun', 'tungku (pembakaran)', latest.suhu_tungku, sp.tungku),
         ]
       : [];
 
-  const jumlahPelanggaran = params.filter((p) => p.violated).length;
-  const status = params.length ? statusDariPelanggaran(jumlahPelanggaran) : health.data?.current?.status || 'normal';
+  const alerts =
+    latest && sp
+      ? hitungAlert({ suhuPirolisis: latest.suhu_pirolisis, suhuTungku: latest.suhu_tungku, statusGas: latest.status_gas, setpoint: sp })
+      : [];
+  const status = latest && sp ? statusDariAlert(alerts) : health.data?.current?.status || 'normal';
   const ui = STATUS_BIG[status];
 
   // Tabel riwayat
@@ -174,10 +175,21 @@ export default function HealthCheck() {
             <span className="text-[13px] text-tinta-60">{params.length} parameter dipantau</span>
           </div>
           <div className="py-2">
-            {(sensor.loading || produksi.loading) && <div className="px-[22px] py-8 text-tinta-40">Memuat parameter…</div>}
-            {params.map((p) => (
+            {(sensor.loading || kontrol.loading) && <div className="px-[22px] py-8 text-tinta-40">Memuat parameter…</div>}
+            {params.map((p) => {
+              const crit = p.violated && p.severity === 'critical';
+              const warn = p.violated && p.severity !== 'critical';
+              const icoTone = crit ? 'bg-critical-bg text-critical' : warn ? 'bg-warning-bg text-warning' : 'bg-normal-bg text-normal';
+              const badgeTone = crit
+                ? 'bg-critical-bg text-critical-teks border-[#ECC4BD]'
+                : warn
+                  ? 'bg-warning-bg text-warning-teks border-[#ECD7A6]'
+                  : 'bg-normal-bg text-normal-teks border-[#CFE0C8]';
+              const pipTone = crit ? 'bg-critical' : warn ? 'bg-warning' : 'bg-normal';
+              const badgeLabel = crit ? 'Bahaya' : warn ? 'Perlu dicek' : 'Normal';
+              return (
               <div key={p.key} className="flex gap-[14px] items-start px-[22px] py-[15px] border-b border-border last:border-b-0">
-                <div className={`w-[34px] h-[34px] rounded-[10px] flex-none grid place-items-center ${p.violated ? 'bg-warning-bg text-warning' : 'bg-normal-bg text-normal'}`}>
+                <div className={`w-[34px] h-[34px] rounded-[10px] flex-none grid place-items-center ${icoTone}`}>
                   <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" {...svg} strokeWidth="1.9">
                     {ICON[p.key]}
                   </svg>
@@ -185,9 +197,9 @@ export default function HealthCheck() {
                 <div className="flex-1 min-w-0">
                   <div className="text-[14.5px] font-semibold flex items-center gap-[9px] flex-wrap">
                     {p.nama}
-                    <span className={`inline-flex items-center gap-[6px] px-[9px] py-[2px] rounded-full text-[11px] font-bold border ${p.violated ? 'bg-warning-bg text-warning-teks border-[#ECD7A6]' : 'bg-normal-bg text-normal-teks border-[#CFE0C8]'}`}>
-                      <span className={`w-[6px] h-[6px] rounded-full ${p.violated ? 'bg-warning' : 'bg-normal'}`} />
-                      {p.violated ? 'Perlu dicek' : 'Normal'}
+                    <span className={`inline-flex items-center gap-[6px] px-[9px] py-[2px] rounded-full text-[11px] font-bold border ${badgeTone}`}>
+                      <span className={`w-[6px] h-[6px] rounded-full ${pipTone}`} />
+                      {badgeLabel}
                     </span>
                   </div>
                   <div className="text-[13px] text-tinta-60 mt-[3px]">{p.desc}</div>
@@ -197,7 +209,8 @@ export default function HealthCheck() {
                   <b className="block text-[15px] text-tinta font-semibold tnum">{p.val}</b>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </Reveal>
       </div>

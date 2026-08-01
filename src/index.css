@@ -221,6 +221,16 @@
   }
 }
 
+/* Drawer navigasi mobile */
+@keyframes amor-drawer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Modal & toast */
 @keyframes amor-rise {
   from {

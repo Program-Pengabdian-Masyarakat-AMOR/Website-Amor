@@ -201,7 +201,7 @@ export default function Sales() {
       <div className="flex items-end justify-between gap-[18px] flex-wrap mb-6">
         <div>
           <div className="text-[13px] text-tinta-40 mb-[5px]">Beranda · Penjualan</div>
-          <h1 className="text-[28px] font-semibold">Penjualan Minyak</h1>
+          <h1 className="text-[28px] font-semibold max-md:text-[21px]">Penjualan Minyak</h1>
           <div className="text-[14px] text-tinta-60 mt-[6px]">Catatan penjualan hasil olahan Reaktor AMOR.</div>
         </div>
         <button onClick={openTambah} className="btn btn-primary px-[18px] py-[11px] text-[14.5px]">

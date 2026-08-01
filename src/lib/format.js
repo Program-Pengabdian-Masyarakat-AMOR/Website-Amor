@@ -41,6 +41,19 @@ export function formatTanggal(input) {
   });
 }
 
+/** Durasi dari detik → menit (dibulatkan), mis. 4320 → "72 mnt" */
+export function formatDurasiDetik(detik) {
+  if (detik == null || Number.isNaN(Number(detik))) return '—';
+  const menit = Math.round(Number(detik) / 60);
+  return `${menit.toLocaleString('id-ID')} mnt`;
+}
+
+/** Detik → menit sebagai angka (untuk perhitungan). */
+export function menitDariDetik(detik) {
+  if (detik == null || Number.isNaN(Number(detik))) return 0;
+  return Math.round(Number(detik) / 60);
+}
+
 /** Jam:menit WIB, mis. 10:42 */
 export function formatJam(input) {
   const d = input instanceof Date ? input : new Date(input);

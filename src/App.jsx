@@ -5,6 +5,7 @@ import Landing from './pages/public/Landing';
 import Login from './pages/public/Login';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import MonitoringLog from './pages/dashboard/MonitoringLog';
+import Kontrol from './pages/dashboard/Kontrol';
 import HealthCheck from './pages/dashboard/HealthCheck';
 import Members from './pages/dashboard/Members';
 import Sales from './pages/dashboard/Sales';
@@ -28,6 +29,7 @@ export default function App() {
       >
         <Route index element={<DashboardHome />} />
         <Route path="monitoring" element={<MonitoringLog />} />
+        <Route path="kontrol" element={<Kontrol />} />
         <Route path="health" element={<HealthCheck />} />
         <Route path="members" element={<Members />} />
         <Route path="sales" element={<Sales />} />

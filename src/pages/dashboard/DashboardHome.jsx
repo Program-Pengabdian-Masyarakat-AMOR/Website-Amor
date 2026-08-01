@@ -7,7 +7,7 @@ import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { hitungPelanggaran, statusDariPelanggaran, THRESHOLDS } from '../../lib/thresholds';
+import { hitungAlert, statusDariAlert, statusSuhu, DEFAULT_SETPOINTS } from '../../lib/thresholds';
 import { formatAngka, formatRupiah, formatJam } from '../../lib/format';
 
 const LineChart = lazy(() => import('../../components/LineChart'));
@@ -59,10 +59,15 @@ export default function DashboardHome() {
   const latest = sensor.data?.latest;
   const sesiTerbaru = produksi.data?.[0];
 
-  const pelanggaran = latest
-    ? hitungPelanggaran({ suhu: latest.suhu_reaktor, gas: latest.gas_level })
+  const alertsMesin = latest
+    ? hitungAlert({
+        suhuPirolisis: latest.suhu_pirolisis,
+        suhuTungku: latest.suhu_tungku,
+        statusGas: latest.status_gas,
+        setpoint: DEFAULT_SETPOINTS,
+      })
     : [];
-  const status = latest ? statusDariPelanggaran(pelanggaran.length) : 'normal';
+  const status = latest ? statusDariAlert(alertsMesin) : 'normal';
   const ui = STATUS_UI[status];
 
   const chartData = (produksi.data || [])
@@ -114,31 +119,27 @@ export default function DashboardHome() {
 
                 <div className="grid grid-cols-3 border-t border-border max-[760px]:grid-cols-1">
                   <Reading
-                    label="Suhu reaktor"
-                    value={formatAngka(latest.suhu_reaktor)}
+                    label="Suhu pirolisis"
+                    value={formatAngka(latest.suhu_pirolisis)}
                     unit="°C"
-                    sub={`Ambang aman ≤ ${THRESHOLDS.suhuMaxAman} °C`}
-                    warn={latest.suhu_reaktor > THRESHOLDS.suhuMaxAman}
+                    sub={`Target ${DEFAULT_SETPOINTS.pirolisis.bawah}–${DEFAULT_SETPOINTS.pirolisis.atas} °C`}
+                    warn={statusSuhu(latest.suhu_pirolisis, DEFAULT_SETPOINTS.pirolisis) !== 'aman'}
                     icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
                   />
                   <Reading
-                    label="Level gas"
-                    value={formatAngka(latest.gas_level)}
-                    unit="ppm"
-                    sub={`Aman ≤ ${THRESHOLDS.gasLevelAman} ppm`}
-                    warn={latest.gas_level > THRESHOLDS.gasLevelAman}
-                    icon={<path d="M12 2.5C12 2.5 5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5z" />}
+                    label="Suhu tungku"
+                    value={formatAngka(latest.suhu_tungku)}
+                    unit="°C"
+                    sub={`Target ${DEFAULT_SETPOINTS.tungku.bawah}–${DEFAULT_SETPOINTS.tungku.atas} °C`}
+                    warn={statusSuhu(latest.suhu_tungku, DEFAULT_SETPOINTS.tungku) !== 'aman'}
+                    icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
                   />
                   <Reading
-                    label="Yield sesi"
-                    value={formatAngka(sesiTerbaru?.yield_percent)}
-                    unit="%"
-                    sub={
-                      sesiTerbaru
-                        ? `${formatAngka(sesiTerbaru.berat_output_minyak)} L dari ${formatAngka(sesiTerbaru.berat_input_total)} kg`
-                        : '—'
-                    }
-                    icon={<path d="M12 2.5C12 2.5 5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5z" />}
+                    label="Status gas"
+                    value={latest.status_gas ? 'Terdeteksi' : 'Aman'}
+                    sub="Sensor MQ-2"
+                    warn={latest.status_gas === true}
+                    icon={<><path d="M3 17a9 9 0 0 1 18 0" /><path d="M12 17a3 3 0 0 0 3-3c0-2-3-6-3-6s-3 4-3 6a3 3 0 0 0 3 3z" /></>}
                     last
                   />
                 </div>
@@ -151,7 +152,7 @@ export default function DashboardHome() {
                     </svg>
                     Diperbarui {latest.timestamp ? formatJam(latest.timestamp) : '—'} WIB
                   </span>
-                  <span>Sesi {sesiLabel(sesiTerbaru?.session_id)} · {latest.status_proses}</span>
+                  <span className="capitalize">Sesi {sesiLabel(sesiTerbaru?.session_id)} · {latest.status_sistem}</span>
                 </div>
               </>
             )}

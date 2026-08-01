@@ -1,39 +1,59 @@
-// Ambang health check (rule-based) — lihat docs/CLAUDE.md → Health check.
-// Disimpan terpusat agar gampang dikalibrasi. Logika final ada di backend FASE 2;
-// mock & UI memakai aturan yang sama.
+// Aturan health check (rule-based) — selaras kontrak IoT (Firebase).
+// Logika final ada di backend; mock & UI memakai aturan yang sama.
+//
+// Prinsip proses: makin panas → pembakaran makin sempurna → gas makin minim.
+// Jadi RISIKO gas justru saat suhu TERLALU RENDAH, sementara suhu TERLALU TINGGI
+// berisiko overheat. Suhu dinilai terhadap PITA target (bawah–atas) dari halaman Kontrol.
+//
+// Severity:
+//   - Suhu di luar pita (rendah/tinggi) → 'warning' saja (CUKUP alert, proses TIDAK dihentikan).
+//   - Gas terdeteksi → 'critical' (bahaya nyata).
 
-export const THRESHOLDS = {
-  suhuMaxAman: 420, // °C — di atas ini dianggap pelanggaran
-  gasLevelAman: 400, // ppm — gas terdeteksi bila melewati ini
-  durasiMin: 45, // menit — proses tak normal bila terlalu cepat
-  durasiMaks: 240, // menit — atau terlalu lama
-  yieldMin: 35, // % — yield di bawah ambang dianggap pelanggaran
+// Setpoint default (bisa dikalibrasi). Target baik: tungku ~800°C, pirolisis ~400°C.
+export const DEFAULT_SETPOINTS = {
+  pirolisis: { bawah: 380, atas: 420 },
+  tungku: { bawah: 780, atas: 820 },
 };
 
-/**
- * Hitung daftar pelanggaran dari satu sesi/pembacaan.
- * @returns {string[]} keterangan tiap pelanggaran
- */
-export function hitungPelanggaran({ suhu, gas, durasi, yield: yieldVal } = {}) {
-  const pelanggaran = [];
-  if (suhu != null && suhu > THRESHOLDS.suhuMaxAman) {
-    pelanggaran.push(`Suhu reaktor ${suhu}°C melewati batas aman ${THRESHOLDS.suhuMaxAman}°C`);
-  }
-  if (gas != null && gas > THRESHOLDS.gasLevelAman) {
-    pelanggaran.push(`Gas terdeteksi pada level ${gas} ppm`);
-  }
-  if (durasi != null && (durasi < THRESHOLDS.durasiMin || durasi > THRESHOLDS.durasiMaks)) {
-    pelanggaran.push(`Durasi proses ${durasi} menit di luar rentang normal`);
-  }
-  if (yieldVal != null && yieldVal < THRESHOLDS.yieldMin) {
-    pelanggaran.push(`Yield ${yieldVal}% di bawah ambang ${THRESHOLDS.yieldMin}%`);
-  }
-  return pelanggaran;
+/** Posisi satu nilai suhu terhadap pita target. */
+export function statusSuhu(nilai, band) {
+  if (nilai == null || !band) return 'aman';
+  if (nilai < band.bawah) return 'rendah';
+  if (nilai > band.atas) return 'tinggi';
+  return 'aman';
 }
 
-/** 0 → normal · 1 → warning · ≥2 → critical */
-export function statusDariPelanggaran(jumlah) {
-  if (jumlah <= 0) return 'normal';
-  if (jumlah === 1) return 'warning';
-  return 'critical';
+/**
+ * Daftar alert dari telemetri terkini.
+ * @returns {{tipe:string, severity:'warning'|'critical', pesan:string}[]}
+ */
+export function hitungAlert({ suhuPirolisis, suhuTungku, statusGas, setpoint = DEFAULT_SETPOINTS } = {}) {
+  const alerts = [];
+
+  if (statusGas === true) {
+    alerts.push({ tipe: 'gas', severity: 'critical', pesan: 'Gas mudah terbakar terdeteksi di sekitar reaktor' });
+  }
+
+  const cek = (label, nilai, band) => {
+    const st = statusSuhu(nilai, band);
+    if (st === 'rendah') {
+      alerts.push({ tipe: 'suhu', severity: 'warning', pesan: `Suhu ${label} ${nilai}°C di bawah target (min ${band.bawah}°C) — pembakaran belum optimal` });
+    } else if (st === 'tinggi') {
+      alerts.push({ tipe: 'suhu', severity: 'warning', pesan: `Suhu ${label} ${nilai}°C melewati batas atas ${band.atas}°C` });
+    }
+  };
+  cek('pirolisis', suhuPirolisis, setpoint.pirolisis);
+  cek('tungku', suhuTungku, setpoint.tungku);
+
+  return alerts;
+}
+
+/**
+ * Status keseluruhan dari daftar alert.
+ * Suhu (warning) TIDAK pernah menjadikan critical — hanya gas yang critical.
+ */
+export function statusDariAlert(alerts = []) {
+  if (alerts.some((a) => a.severity === 'critical')) return 'critical';
+  if (alerts.length) return 'warning';
+  return 'normal';
 }

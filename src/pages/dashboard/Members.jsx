@@ -121,7 +121,7 @@ export default function Members() {
       <div className="flex items-end justify-between gap-[18px] flex-wrap mb-6">
         <div>
           <div className="text-[13px] text-tinta-40 mb-[5px]">Beranda · Anggota</div>
-          <h1 className="text-[28px] font-semibold">Manajemen Anggota</h1>
+          <h1 className="text-[28px] font-semibold max-md:text-[21px]">Manajemen Anggota</h1>
           <div className="text-[14px] text-tinta-60 mt-[6px]">Tim pelaksana & operator program AMOR.</div>
         </div>
         <button onClick={openTambah} className="btn btn-primary px-[18px] py-[11px] text-[14.5px]">
@@ -167,7 +167,7 @@ export default function Members() {
           <p>Belum ada anggota pada kategori ini.</p>
         </div>
       ) : (
-        <div className="grid gap-[18px] grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+        <div className="grid gap-[18px] grid-cols-[repeat(auto-fill,minmax(260px,1fr))] max-[420px]:grid-cols-1">
           {list.map((m, i) => (
             <Reveal
               key={m.id}

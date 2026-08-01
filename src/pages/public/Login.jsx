@@ -85,7 +85,7 @@ export default function Login() {
   return (
     <div className="grid lg:grid-cols-[1.05fr_.95fr] min-h-screen">
       {/* Brand panel */}
-      <aside className="relative overflow-hidden bg-olive text-[#EEF1EA] flex flex-col px-14 py-[54px] max-[840px]:px-8 max-[840px]:py-10">
+      <aside className="relative overflow-hidden bg-olive text-[#EEF1EA] flex flex-col px-14 py-[54px] max-[840px]:px-8 max-[840px]:py-10 max-[640px]:hidden">
         <span className="absolute -right-[120px] -bottom-[120px] w-[380px] h-[380px] rounded-full border-[1.5px] border-white/[.08]" />
         <span className="absolute -right-[60px] -bottom-[60px] w-[240px] h-[240px] rounded-full border-[1.5px] border-white/[.07]" />
         <div className="font-heading font-semibold text-[28px] leading-none relative z-10">

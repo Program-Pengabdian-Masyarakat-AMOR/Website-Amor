@@ -7,18 +7,15 @@ import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
-import { THRESHOLDS } from '../../lib/thresholds';
-import { formatAngka, formatJam, formatTanggal } from '../../lib/format';
+import { statusSuhu } from '../../lib/thresholds';
+import { formatAngka, formatJam, formatTanggal, formatDurasiDetik, menitDariDetik } from '../../lib/format';
 
 const LineChart = lazy(() => import('../../components/LineChart'));
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
-const STATUS_PROSES = ['idle', 'running', 'finished'];
 const MAX_POINTS = 14;
 
-function sesiLabel(id) {
-  return id ? id.replace('SES-', '#') : '—';
-}
+const sesiLabel = (id) => (id ? id.replace('SES-', '#') : '—');
 
 function yieldTone(v) {
   if (v >= 67) return 'text-normal-teks';
@@ -29,32 +26,30 @@ function yieldTone(v) {
 export default function MonitoringLog() {
   const sensor = useApi(() => api.get('/sensor-data/latest'), []);
   const produksi = useApi(() => api.get('/production-logs'), []);
+  const kontrol = useApi(() => api.get('/control'), []);
 
   const [current, setCurrent] = useState(null);
   const [serie, setSerie] = useState([]);
 
-  // Seed dari sensor-data/latest sekali saat data tiba.
   useEffect(() => {
     if (!sensor.data) return;
     setCurrent(sensor.data.latest);
     setSerie(
       (sensor.data.series || []).map((p) => ({
         t: formatJam(p.timestamp),
-        suhu: p.suhu_reaktor,
-        berat: p.berat_input,
+        pirolisis: p.suhu_pirolisis,
+        tungku: p.suhu_tungku,
+        berat: p.berat_sampah,
       }))
     );
   }, [sensor.data]);
 
-  // Langganan fake-socket: update kartu + dorong titik baru ke grafik.
   useEffect(() => {
     const socket = getSocket();
-    function onSensor(payload) {
-      setCurrent(payload);
+    function onSensor(p) {
+      setCurrent(p);
       setSerie((prev) =>
-        [...prev, { t: formatJam(payload.timestamp), suhu: payload.suhu_reaktor, berat: payload.berat_input }].slice(
-          -MAX_POINTS
-        )
+        [...prev, { t: formatJam(p.timestamp), pirolisis: p.suhu_pirolisis, tungku: p.suhu_tungku, berat: p.berat_sampah }].slice(-MAX_POINTS)
       );
     }
     socket.on('sensor-update', onSensor);
@@ -62,7 +57,12 @@ export default function MonitoringLog() {
   }, []);
 
   const sesi = produksi.data?.[0];
-  const proses = current?.status_proses || 'running';
+  const proses = current?.status_sistem || 'idle';
+  const sp = kontrol.data;
+
+  const gasTerdeteksi = current?.status_gas === true;
+  const suhuPirTone = sp ? statusSuhu(current?.suhu_pirolisis, sp.pirolisis) : 'aman';
+  const suhuTunTone = sp ? statusSuhu(current?.suhu_tungku, sp.tungku) : 'aman';
 
   const columns = [
     {
@@ -76,16 +76,12 @@ export default function MonitoringLog() {
         </div>
       ),
     },
-    { key: 'in', header: 'Input (kg)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.berat_input_total) },
-    { key: 'out', header: 'Output (kg)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.berat_output_minyak) },
-    {
-      key: 'yield',
-      header: 'Yield (%)',
-      align: 'right',
-      render: (r) => <span className={`font-semibold tnum ${yieldTone(r.yield_percent)}`}>{formatAngka(r.yield_percent)}</span>,
-    },
-    { key: 'suhu', header: 'Suhu rata² (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_avg) },
-    { key: 'durasi', header: 'Durasi (mnt)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.durasi_menit) },
+    { key: 'sampah', header: 'Sampah (kg)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.berat_sampah_total) },
+    { key: 'minyak', header: 'Minyak (kg)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.berat_minyak_total) },
+    { key: 'yield', header: 'Yield (%)', align: 'right', render: (r) => <span className={`font-semibold tnum ${yieldTone(r.yield_percent)}`}>{formatAngka(r.yield_percent)}</span> },
+    { key: 'pir', header: 'Pirolisis (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_pirolisis_avg) },
+    { key: 'tun', header: 'Tungku (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_tungku_avg) },
+    { key: 'durasi', header: 'Durasi (mnt)', align: 'right', cellClass: 'tnum font-medium', render: (r) => menitDariDetik(r.waktu_proses_detik) },
   ];
 
   const rows = produksi.data || [];
@@ -93,11 +89,12 @@ export default function MonitoringLog() {
   const footer = rows.length
     ? [
         { content: `Rata-rata ${rows.length} sesi` },
-        { content: <b>{formatAngka(avg('berat_input_total'))}</b>, align: 'right', className: 'tnum' },
-        { content: <b>{formatAngka(avg('berat_output_minyak'))}</b>, align: 'right', className: 'tnum' },
+        { content: <b>{formatAngka(avg('berat_sampah_total'))}</b>, align: 'right', className: 'tnum' },
+        { content: <b>{formatAngka(avg('berat_minyak_total'))}</b>, align: 'right', className: 'tnum' },
         { content: <b>{formatAngka(avg('yield_percent'))}</b>, align: 'right', className: 'tnum' },
-        { content: <b>{formatAngka(avg('suhu_avg'))}</b>, align: 'right', className: 'tnum' },
-        { content: <b>{formatAngka(avg('durasi_menit'))}</b>, align: 'right', className: 'tnum' },
+        { content: <b>{formatAngka(avg('suhu_pirolisis_avg'))}</b>, align: 'right', className: 'tnum' },
+        { content: <b>{formatAngka(avg('suhu_tungku_avg'))}</b>, align: 'right', className: 'tnum' },
+        { content: <b>{menitDariDetik(avg('waktu_proses_detik'))}</b>, align: 'right', className: 'tnum' },
       ]
     : undefined;
 
@@ -116,63 +113,71 @@ export default function MonitoringLog() {
         </span>
         <span className="w-px h-[26px] bg-border" />
         <span className="text-[13px] text-tinta-60">
-          Sesi berjalan <b className="text-tinta font-semibold">{sesiLabel(sesi?.session_id)}</b>
+          Sesi terakhir <b className="text-tinta font-semibold">{sesiLabel(sesi?.session_id)}</b>
         </span>
         <span className="w-px h-[26px] bg-border" />
         <span className="text-[13px] text-tinta-60">
-          Durasi <b className="text-tinta font-semibold tnum">{sesi ? `${formatAngka(sesi.durasi_menit)} mnt` : '—'}</b>
+          Durasi <b className="text-tinta font-semibold tnum">{sesi ? formatDurasiDetik(sesi.waktu_proses_detik) : '—'}</b>
         </span>
-        <span className="ml-auto inline-flex items-center gap-2 text-[12.5px] font-semibold text-normal-teks bg-normal-bg border border-[#CFE0C8] rounded-full px-[13px] py-[6px]">
-          <span className="live-dot" />
-          Sedang berproduksi
+        <span className={`ml-auto inline-flex items-center gap-2 text-[12.5px] font-semibold rounded-full px-[13px] py-[6px] border ${proses === 'running' ? 'text-normal-teks bg-normal-bg border-[#CFE0C8]' : 'text-tinta-60 bg-permukaan-2 border-border'}`}>
+          {proses === 'running' && <span className="live-dot" />}
+          {proses === 'running' ? 'Sedang berproduksi' : 'Idle'}
         </span>
       </Reveal>
 
       {/* Sensor cards */}
-      <Reveal delay={60} className="grid grid-cols-4 gap-[18px] mb-6 max-[1080px]:grid-cols-2 max-[760px]:grid-cols-1">
+      <Reveal delay={60} className="grid grid-cols-3 gap-[18px] mb-6 max-[1080px]:grid-cols-2 max-[680px]:grid-cols-1">
         <SensorCard
           tone="olive"
           live
-          label="Berat bahan baku"
-          value={current ? formatAngka(current.berat_input) : '—'}
+          label="Berat sampah"
+          value={current ? formatAngka(current.berat_sampah) : '—'}
           unit="kg"
-          sub="Tersisa di reaktor"
+          sub={current ? `Total masuk: ${formatAngka(current.berat_sampah_total)} kg` : '—'}
           icon={<><path d="M12 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" /><path d="M6.5 7h11l2.5 11a2 2 0 0 1-2 2.4H6a2 2 0 0 1-2-2.4z" /></>}
         />
         <SensorCard
           live
-          label="Suhu reaktor"
-          value={current ? formatAngka(current.suhu_reaktor) : '—'}
+          label="Berat minyak"
+          value={current ? formatAngka(current.berat_minyak) : '—'}
+          unit="kg"
+          sub="Terkumpul sesi ini"
+          icon={<path d="M12 2.5C12 2.5 5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5z" />}
+        />
+        <SensorCard
+          live
+          label="Status gas (MQ-2)"
+          sub={gasTerdeteksi ? 'Periksa sekitar reaktor' : 'Tidak ada indikasi kebocoran'}
+          icon={<><path d="M3 17a9 9 0 0 1 18 0" /><path d="M12 17a3 3 0 0 0 3-3c0-2-3-6-3-6s-3 4-3 6a3 3 0 0 0 3 3z" /></>}
+        >
+          <span className={`badge ${gasTerdeteksi ? 'b-critical' : 'b-normal'} mt-1 self-start`}>
+            <span className="pip" />
+            {gasTerdeteksi ? 'Terdeteksi' : 'Aman'}
+          </span>
+        </SensorCard>
+        <SensorCard
+          live
+          label="Suhu pirolisis"
+          value={current ? formatAngka(current.suhu_pirolisis) : '—'}
           unit="°C"
-          sub={`Ambang aman ≤ ${THRESHOLDS.suhuMaxAman} °C`}
+          sub={sp ? `Target ${sp.pirolisis.bawah}–${sp.pirolisis.atas} °C${suhuPirTone !== 'aman' ? ` · ${suhuPirTone === 'rendah' ? 'di bawah target' : 'di atas batas'}` : ''}` : 'Reaktor'}
           icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
         />
         <SensorCard
           live
-          label="Level gas (MQ-2)"
-          value={current ? formatAngka(current.gas_level) : '—'}
-          unit="ppm"
-          sub={`Aman ≤ ${THRESHOLDS.gasLevelAman} ppm`}
-          icon={<><path d="M3 17a9 9 0 0 1 18 0" /><path d="M12 17a3 3 0 0 0 3-3c0-2-3-6-3-6s-3 4-3 6a3 3 0 0 0 3 3z" /></>}
+          label="Suhu tungku"
+          value={current ? formatAngka(current.suhu_tungku) : '—'}
+          unit="°C"
+          sub={sp ? `Target ${sp.tungku.bawah}–${sp.tungku.atas} °C${suhuTunTone !== 'aman' ? ` · ${suhuTunTone === 'rendah' ? 'di bawah target' : 'di atas batas'}` : ''}` : 'Pembakaran'}
+          icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
         />
         <SensorCard
           tone="olive"
-          label="Status proses"
+          label="Status sistem"
+          sub="Kondisi mesin"
           icon={<polygon points="6 4 20 12 6 20 6 4" />}
         >
-          <div className="font-body font-semibold text-[24px] leading-none capitalize">{proses}</div>
-          <div className="inline-flex gap-0 border border-border rounded-full p-[2px] mt-1 self-start">
-            {STATUS_PROSES.map((s) => (
-              <span
-                key={s}
-                className={`text-[11.5px] font-semibold px-[10px] py-[3px] rounded-full capitalize ${
-                  s === proses ? 'bg-olive text-white' : 'text-tinta-40'
-                }`}
-              >
-                {s}
-              </span>
-            ))}
-          </div>
+          <div className="font-body font-semibold text-[24px] leading-none capitalize mt-1">{proses}</div>
         </SensorCard>
       </Reveal>
 
@@ -183,9 +188,10 @@ export default function MonitoringLog() {
             <h3 className="text-[16px] font-semibold">Tren suhu & berat selama proses</h3>
             <div className="text-[13px] text-tinta-60">Sesi {sesiLabel(sesi?.session_id)} · diperbarui langsung</div>
           </div>
-          <div className="flex gap-[18px] text-[12.5px] text-tinta-60">
-            <span className="inline-flex items-center"><i className="w-[18px] border-t-[2.5px] border-amber inline-block mr-[7px]" />Suhu reaktor (°C)</span>
-            <span className="inline-flex items-center"><i className="w-[18px] border-t-[2.5px] border-olive inline-block mr-[7px]" />Berat bahan (kg)</span>
+          <div className="flex gap-[18px] text-[12.5px] text-tinta-60 flex-wrap">
+            <span className="inline-flex items-center"><i className="w-[18px] border-t-[2.5px] border-amber inline-block mr-[7px]" />Suhu pirolisis (°C)</span>
+            <span className="inline-flex items-center"><i className="w-[18px] border-t-[2.5px] border-critical inline-block mr-[7px]" />Suhu tungku (°C)</span>
+            <span className="inline-flex items-center"><i className="w-[18px] border-t-[2.5px] border-olive inline-block mr-[7px]" />Berat sampah (kg)</span>
           </div>
         </div>
         <div className="px-5 pt-[18px] pb-[14px]">
@@ -200,10 +206,11 @@ export default function MonitoringLog() {
                 xKey="t"
                 height={280}
                 lines={[
-                  { dataKey: 'suhu', name: 'Suhu', color: '#D9641E', area: true, yAxisId: 'left', unit: '°C' },
+                  { dataKey: 'pirolisis', name: 'Pirolisis', color: '#D9641E', area: true, yAxisId: 'left', unit: '°C' },
+                  { dataKey: 'tungku', name: 'Tungku', color: '#B23A30', yAxisId: 'left', unit: '°C' },
                   { dataKey: 'berat', name: 'Berat', color: '#3A4D39', yAxisId: 'right', unit: 'kg' },
                 ]}
-                leftAxis={{ domain: [0, 450], color: '#BC5618' }}
+                leftAxis={{ domain: [0, 900], color: '#BC5618' }}
                 rightAxis={{ domain: [0, 16], color: '#3A4D39' }}
               />
             </Suspense>
