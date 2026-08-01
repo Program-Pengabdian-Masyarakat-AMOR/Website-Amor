@@ -60,10 +60,13 @@ export default function HealthCheck() {
   const sp = kontrol.data;
 
   function paramSuhu(key, label, nilai, band) {
+    const running = latest?.status_sistem === 'running';
     const st = statusSuhu(nilai, band);
-    const violated = st !== 'aman';
-    const catatan =
-      st === 'rendah'
+    // Saat idle, suhu tidak dinilai (mesin belum memanaskan) → dianggap aman.
+    const violated = running && st !== 'aman';
+    const catatan = !running
+      ? 'mesin idle — dinilai saat proses berjalan'
+      : st === 'rendah'
         ? 'di bawah target — pembakaran belum optimal & gas berpotensi naik'
         : st === 'tinggi'
           ? 'melewati batas atas — risiko overheat'
@@ -99,7 +102,7 @@ export default function HealthCheck() {
 
   const alerts =
     latest && sp
-      ? hitungAlert({ suhuPirolisis: latest.suhu_pirolisis, suhuTungku: latest.suhu_tungku, statusGas: latest.status_gas, setpoint: sp })
+      ? hitungAlert({ suhuPirolisis: latest.suhu_pirolisis, suhuTungku: latest.suhu_tungku, statusGas: latest.status_gas, statusSistem: latest.status_sistem, setpoint: sp })
       : [];
   const status = latest && sp ? statusDariAlert(alerts) : health.data?.current?.status || 'normal';
   const ui = STATUS_BIG[status];

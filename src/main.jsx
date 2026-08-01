@@ -5,11 +5,10 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import './index.css';
 
-// Aktifkan MSW hanya di dev (atau bila VITE_USE_MOCKS=true) supaya
-// gampang dimatikan di FASE 2 — lihat docs/CLAUDE.md.
+// MSW kini OPT-IN: aktif hanya bila VITE_USE_MOCKS=true.
+// Default (dev & prod) memakai backend asli lewat VITE_API_BASE_URL + VITE_SOCKET_URL.
 async function enableMocking() {
-  const useMocks = import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS === 'true';
-  if (!useMocks) return;
+  if (import.meta.env.VITE_USE_MOCKS !== 'true') return;
   const { worker } = await import('./mocks/browser.js');
   return worker.start({
     onUnhandledRequest: 'bypass',

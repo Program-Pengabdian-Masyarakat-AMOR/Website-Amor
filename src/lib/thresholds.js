@@ -27,23 +27,26 @@ export function statusSuhu(nilai, band) {
  * Daftar alert dari telemetri terkini.
  * @returns {{tipe:string, severity:'warning'|'critical', pesan:string}[]}
  */
-export function hitungAlert({ suhuPirolisis, suhuTungku, statusGas, setpoint = DEFAULT_SETPOINTS } = {}) {
+export function hitungAlert({ suhuPirolisis, suhuTungku, statusGas, statusSistem, setpoint = DEFAULT_SETPOINTS } = {}) {
   const alerts = [];
 
   if (statusGas === true) {
     alerts.push({ tipe: 'gas', severity: 'critical', pesan: 'Gas mudah terbakar terdeteksi di sekitar reaktor' });
   }
 
-  const cek = (label, nilai, band) => {
-    const st = statusSuhu(nilai, band);
-    if (st === 'rendah') {
-      alerts.push({ tipe: 'suhu', severity: 'warning', pesan: `Suhu ${label} ${nilai}°C di bawah target (min ${band.bawah}°C) — pembakaran belum optimal` });
-    } else if (st === 'tinggi') {
-      alerts.push({ tipe: 'suhu', severity: 'warning', pesan: `Suhu ${label} ${nilai}°C melewati batas atas ${band.atas}°C` });
-    }
-  };
-  cek('pirolisis', suhuPirolisis, setpoint.pirolisis);
-  cek('tungku', suhuTungku, setpoint.tungku);
+  // Suhu hanya dinilai saat mesin BERPROSES. Saat idle, suhu rendah (ruang) itu wajar.
+  if (statusSistem === 'running') {
+    const cek = (label, nilai, band) => {
+      const st = statusSuhu(nilai, band);
+      if (st === 'rendah') {
+        alerts.push({ tipe: 'suhu', severity: 'warning', pesan: `Suhu ${label} ${nilai}°C di bawah target (min ${band.bawah}°C) — pembakaran belum optimal` });
+      } else if (st === 'tinggi') {
+        alerts.push({ tipe: 'suhu', severity: 'warning', pesan: `Suhu ${label} ${nilai}°C melewati batas atas ${band.atas}°C` });
+      }
+    };
+    cek('pirolisis', suhuPirolisis, setpoint.pirolisis);
+    cek('tungku', suhuTungku, setpoint.tungku);
+  }
 
   return alerts;
 }

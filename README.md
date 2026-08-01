@@ -68,10 +68,12 @@ src/
 └── services/      # pembungkus fetch & koneksi real-time
 ```
 
-## Catatan
+## Backend
 
-Saat ini data masih menggunakan **mock API** agar pengembangan antarmuka bisa berjalan tanpa server.
-Detail kontrak datanya ada di [`src/mocks/README.md`](src/mocks/README.md). Integrasi dengan backend
-asli (API + database + model prediksi) dilakukan pada tahap berikutnya tanpa mengubah antarmuka.
+Secara default (`npm run dev`) frontend terhubung ke **backend AMOR** di `http://localhost:4000`
+(lihat `.env.development`). Jalankan backend lebih dulu — petunjuknya ada di folder `backend/`.
+
+Ingin menjalankan **tanpa backend** (mode mock)? Set `VITE_USE_MOCKS=true` (mis. di `.env.local`).
+Mode ini memakai MSW + data contoh; kontraknya ada di [`src/mocks/README.md`](src/mocks/README.md).
 
 Angka prediksi yield bersifat sementara dan akan semakin akurat seiring bertambahnya data produksi nyata.

@@ -64,6 +64,7 @@ export default function DashboardHome() {
         suhuPirolisis: latest.suhu_pirolisis,
         suhuTungku: latest.suhu_tungku,
         statusGas: latest.status_gas,
+        statusSistem: latest.status_sistem,
         setpoint: DEFAULT_SETPOINTS,
       })
     : [];

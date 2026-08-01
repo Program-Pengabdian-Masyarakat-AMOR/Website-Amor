@@ -47,6 +47,15 @@ async function request(path, { method = 'GET', body, headers, ...rest } = {}) {
   }
 
   if (!res.ok) {
+    // Token kedaluwarsa/invalid pada request privat → bersihkan sesi & arahkan ke login.
+    if (res.status === 401 && token && !path.includes('/auth/login')) {
+      clearToken();
+      localStorage.removeItem('amor.role');
+      localStorage.removeItem('amor.username');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
+    }
     const message = (data && data.message) || `Permintaan gagal (${res.status})`;
     throw new ApiError(message, res.status, data);
   }

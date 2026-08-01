@@ -26,6 +26,7 @@ function healthTerkini() {
     suhuPirolisis: sensorLatest.suhu_pirolisis,
     suhuTungku: sensorLatest.suhu_tungku,
     statusGas: sensorLatest.status_gas,
+    statusSistem: sensorLatest.status_sistem,
     setpoint: control,
   });
   return {
