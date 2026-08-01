@@ -1,21 +1,17 @@
-# Logs
-logs
+# Monorepo AMOR — root
+# Folder non-kode yang tidak ikut ke repo:
+.claude/
+docs/
+prototype/
+
+# Jaring pengaman (aturan detail ada di frontend/.gitignore & backend/.gitignore):
+node_modules/
+dist/
 *.log
-npm-debug.log*
 
-# Dependencies
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Rahasia — jangan pernah di-commit:
+**/.env
+**/serviceAccount*.json
+**/*.pem
+**/dev.db
+**/dev.db-journal

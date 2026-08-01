@@ -1,0 +1,12 @@
+node_modules
+.env
+*.log
+
+# Prisma / SQLite
+prisma/dev.db
+prisma/dev.db-journal
+prisma/migrations/dev/
+
+# Firebase service account (jangan pernah di-commit)
+serviceAccount*.json
+*.pem

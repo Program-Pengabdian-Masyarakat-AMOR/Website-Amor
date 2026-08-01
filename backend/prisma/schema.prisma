@@ -1,0 +1,65 @@
+// Prisma schema — dev pakai SQLite. Untuk produksi, ganti provider ke "postgresql"
+// dan DATABASE_URL ke connection string PostgreSQL.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("operator") // admin | operator
+  createdAt    DateTime @default(now())
+}
+
+model Member {
+  id        Int      @id @default(autoincrement())
+  nama      String
+  nimNip    String
+  jabatan   String
+  kontak    String
+  foto      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Sale {
+  id           Int      @id @default(autoincrement())
+  tanggal      String // YYYY-MM-DD
+  jumlahLiter  Float
+  hargaPerLiter Float
+  totalHarga   Float
+  pembeli      String
+  createdAt    DateTime @default(now())
+}
+
+model ProductionLog {
+  id                Int      @id @default(autoincrement())
+  sessionId         String
+  beratSampahTotal  Float
+  beratMinyakTotal  Float
+  yieldPercent      Float
+  waktuProsesDetik  Int
+  suhuPirolisisAvg  Float?
+  suhuTungkuAvg     Float?
+  createdAt         DateTime @default(now())
+}
+
+model HealthStatus {
+  id        Int      @id @default(autoincrement())
+  sessionId String
+  status    String // normal | warning | critical
+  keterangan String
+  createdAt DateTime @default(now())
+}
+
+model Prediction {
+  id            Int    @id @default(autoincrement())
+  sessionId     String
+  predictedYield Float?
+  actualYield   Float?
+}
