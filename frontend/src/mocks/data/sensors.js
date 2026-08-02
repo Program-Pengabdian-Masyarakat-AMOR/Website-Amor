@@ -1,8 +1,8 @@
-// Telemetri IoT → Web (via Firebase, direlay backend). Bentuk objek:
+// Telemetri IoT → Web (via Firebase node /monitoring, direlay backend). Bentuk objek:
 //   suhu_pirolisis, suhu_tungku : number (°C)
 //   berat_sampah, berat_minyak, berat_sampah_total : number (kg)
 //   status_gas : boolean (true = terdeteksi)
-//   status_sistem : "idle" | "running"
+//   status_sistem : "idle" | "running" | "finished"  (kanonik; perangkat kirim IDLE/PROCESS/FINISH)
 export const sensorLatest = {
   timestamp: '2026-06-13T03:42:00.000Z',
   suhu_pirolisis: 402,
@@ -14,8 +14,7 @@ export const sensorLatest = {
   status_sistem: 'running',
 };
 
-// Tren selama sesi berjalan (suhu naik ke target, berat sampah menyusut,
-// minyak bertambah). Dipakai grafik Monitoring.
+// Tren selama sesi berjalan (suhu naik ke target, sampah menyusut, minyak bertambah).
 const mulai = Date.UTC(2026, 5, 13, 1, 28);
 const trace = [
   { menit: 0, pir: 90, tun: 180, sampah: 15.2, minyak: 0.0, gas: true },

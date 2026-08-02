@@ -1,8 +1,6 @@
-// Status kontrol Web → IoT (dikirim FE ke Firebase /input/... lewat backend).
-// Struktur mirror path Firebase:
-//   /input/pirolisis/suhu_bawah, /input/pirolisis/suhu_atas  (Integer)
-//   /input/tungku/suhu_bawah,    /input/tungku/suhu_atas     (Integer)
-//   /input/kontrol/blower, /input/kontrol/feeder             (Boolean)
+// Nilai kontrol Web → IoT (FE → backend → Firebase node input, key datar).
+// Firmware membaca: input/pirolisis_bawah, pirolisis_atas, tungku_bawah, tungku_atas (Integer).
+// Blower & feeder: input/blower, input/feeder (Boolean) — key datar juga.
 export const controlDefault = {
   pirolisis: { bawah: 380, atas: 420 },
   tungku: { bawah: 780, atas: 820 },

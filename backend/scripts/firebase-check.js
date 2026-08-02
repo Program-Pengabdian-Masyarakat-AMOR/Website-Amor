@@ -8,7 +8,7 @@ if (!db) {
   process.exit(1);
 }
 
-const nodes = ['suhu', 'berat', 'gas', 'status', 'hasil_akhir', 'input'];
+const nodes = ['monitoring', 'input'];
 console.log('📡 Terhubung. Isi node saat ini:\n');
 for (const n of nodes) {
   const val = (await db.ref(n).get()).val();

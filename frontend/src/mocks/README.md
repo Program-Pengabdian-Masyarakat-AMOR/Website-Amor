@@ -19,22 +19,26 @@ Saat backend siap: matikan MSW, arahkan base URL, ganti fake-socket → socket.i
 ## Struktur Firebase (acuan perangkat & backend)
 
 **IoT → Web** (perangkat menulis, backend membaca):
+Semua telemetri ada di SATU node `monitoring/`:
 ```
-berat/        berat_minyak (number)  berat_sampah (number)  berat_sampah_total (number)
-gas/          status_gas (boolean)                    // true = gas terdeteksi
-hasil_akhir/  berat_minyak_total (number)  berat_sampah_total (number)  waktu_proses (string, detik)
-status/       status_sistem (string)                  // "idle" | "running"
-suhu/         suhu_pirolisis (number)  suhu_tungku (number)
+monitoring/
+  suhu_pirolisis (number, °C)  suhu_tungku (number, °C)
+  berat_sampah (number)  berat_minyak (number)  berat_sampah_total (number)
+  status_gas (boolean)                  // true = gas terdeteksi
+  status_sistem (string)                // "IDLE" | "PROCESS" | "FINISH"
+  berat_sampah_total_akhir (number)  berat_minyak_total_akhir (number)  waktu_proses (number, detik)
 ```
+Backend menormalkan `status_sistem`: `PROCESS→running`, `IDLE→idle`, `FINISH→finished`.
+Saat `FINISH`, backend mencatat log produksi dari field `*_akhir` + `waktu_proses`.
 
-**Web → IoT** (backend menulis dari perintah FE):
+**Web → IoT** (backend menulis ke node `input`, **key datar** sesuai firmware):
 ```
-/input/pirolisis/suhu_bawah   Integer
-/input/pirolisis/suhu_atas    Integer
-/input/tungku/suhu_bawah      Integer
-/input/tungku/suhu_atas       Integer
-/input/kontrol/blower         Boolean
-/input/kontrol/feeder         Boolean
+input/pirolisis_bawah   Integer
+input/pirolisis_atas    Integer
+input/tungku_bawah      Integer
+input/tungku_atas       Integer
+input/blower            Boolean
+input/feeder            Boolean
 ```
 
 ---
@@ -45,11 +49,11 @@ suhu/         suhu_pirolisis (number)  suhu_tungku (number)
 ```
 { timestamp, suhu_pirolisis, suhu_tungku,
   berat_sampah, berat_minyak, berat_sampah_total,
-  status_gas: boolean, status_sistem: "idle"|"running" }
+  status_gas: boolean, status_sistem: "idle"|"running"|"finished" }
 ```
 
-### production_logs (hasil_akhir per sesi)
-Field mentah IoT: `berat_minyak_total`, `berat_sampah_total`, `waktu_proses` (detik).
+### production_logs (hasil akhir per sesi, saat FINISH)
+Field mentah dari `monitoring/`: `berat_sampah_total_akhir`, `berat_minyak_total_akhir`, `waktu_proses` (detik).
 Field turunan backend: `session_id`, `yield_percent`, `suhu_pirolisis_avg`, `suhu_tungku_avg`, `created_at`.
 ```
 { id, session_id, berat_sampah_total, berat_minyak_total, yield_percent,
@@ -87,8 +91,8 @@ Rumus: `yield_percent = (berat_minyak_total / berat_sampah_total) * 100`. UI men
 
 ### Kontrol (Web → IoT)
 - `GET /api/control` → objek control saat ini (read-back)
-- `PUT /api/control/setpoint` body `{ pirolisis:{bawah,atas}, tungku:{bawah,atas} }` (integer) → control terbaru
-- `PUT /api/control/kontrol` body `{ blower?:boolean, feeder?:boolean }` → control terbaru
+- `PUT /api/control/setpoint` body `{ pirolisis:{bawah,atas}, tungku:{bawah,atas} }` (integer) → setpoint terbaru (ditulis key datar ke Firebase)
+- `PUT /api/control/kontrol` body `{ blower?:boolean, feeder?:boolean }` → control terbaru (ditulis `input/blower`, `input/feeder`)
 
 ### Anggota & penjualan
 - `GET/POST /api/members` · `PUT/DELETE /api/members/:id`
@@ -116,10 +120,11 @@ Ada di `src/lib/thresholds.js` (mock & UI memakai aturan yang sama; final di bac
 Prinsip proses: **makin panas → pembakaran makin sempurna → gas makin minim**. Jadi suhu dinilai
 terhadap **pita target** (setpoint `bawah`–`atas`), bukan sekadar batas atas.
 
-Alert & severity:
+Alert & severity (suhu **pirolisis & tungku** dinilai terhadap pita target masing-masing):
 - `status_gas === true` → gas terdeteksi → **critical** (bahaya nyata).
-- `suhu_pirolisis` / `suhu_tungku` **< bawah** → pembakaran belum optimal → **warning**.
-- `suhu_pirolisis` / `suhu_tungku` **> atas** → overheat → **warning**.
+- `suhu_pirolisis` / `suhu_tungku` **< bawah** (saat running) → pembakaran belum optimal → **warning**.
+- `suhu_pirolisis` / `suhu_tungku` **> atas** (saat running) → overheat → **warning**.
 
+Suhu hanya dievaluasi saat `status_sistem = running`; saat idle/finished dianggap aman.
 Status keseluruhan = severity tertinggi: ada `critical` → **critical**; ada alert lain → **warning**; tidak ada → **normal**.
 **Suhu di luar pita hanya memicu peringatan (warning) — TIDAK pernah menghentikan proses.** Hanya gas yang critical.

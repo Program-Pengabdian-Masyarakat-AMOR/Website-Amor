@@ -23,7 +23,7 @@ function validasiGrup(nama, grup) {
 // GET /api/control → { pirolisis:{bawah,atas}, tungku:{bawah,atas}, blower, feeder }
 router.get('/', requireAuth, (req, res) => res.json(getControl()));
 
-// PUT /api/control/setpoint (integer °C) → Firebase /input/pirolisis|tungku
+// PUT /api/control/setpoint (integer °C) → Firebase input (key datar)
 router.put(
   '/setpoint',
   requireAuth,
@@ -42,7 +42,7 @@ router.put(
   })
 );
 
-// PUT /api/control/kontrol (boolean) → Firebase /input/kontrol
+// PUT /api/control/kontrol (boolean) → Firebase input/blower, input/feeder
 router.put(
   '/kontrol',
   requireAuth,

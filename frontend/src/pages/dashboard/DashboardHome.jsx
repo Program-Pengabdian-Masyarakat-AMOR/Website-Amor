@@ -124,7 +124,7 @@ export default function DashboardHome() {
                     value={formatAngka(latest.suhu_pirolisis)}
                     unit="°C"
                     sub={`Target ${DEFAULT_SETPOINTS.pirolisis.bawah}–${DEFAULT_SETPOINTS.pirolisis.atas} °C`}
-                    warn={statusSuhu(latest.suhu_pirolisis, DEFAULT_SETPOINTS.pirolisis) !== 'aman'}
+                    warn={latest.status_sistem === 'running' && statusSuhu(latest.suhu_pirolisis, DEFAULT_SETPOINTS.pirolisis) !== 'aman'}
                     icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
                   />
                   <Reading
@@ -132,7 +132,7 @@ export default function DashboardHome() {
                     value={formatAngka(latest.suhu_tungku)}
                     unit="°C"
                     sub={`Target ${DEFAULT_SETPOINTS.tungku.bawah}–${DEFAULT_SETPOINTS.tungku.atas} °C`}
-                    warn={statusSuhu(latest.suhu_tungku, DEFAULT_SETPOINTS.tungku) !== 'aman'}
+                    warn={latest.status_sistem === 'running' && statusSuhu(latest.suhu_tungku, DEFAULT_SETPOINTS.tungku) !== 'aman'}
                     icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
                   />
                   <Reading

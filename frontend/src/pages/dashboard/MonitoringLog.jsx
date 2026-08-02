@@ -121,7 +121,7 @@ export default function MonitoringLog() {
         </span>
         <span className={`ml-auto inline-flex items-center gap-2 text-[12.5px] font-semibold rounded-full px-[13px] py-[6px] border ${proses === 'running' ? 'text-normal-teks bg-normal-bg border-[#CFE0C8]' : 'text-tinta-60 bg-permukaan-2 border-border'}`}>
           {proses === 'running' && <span className="live-dot" />}
-          {proses === 'running' ? 'Sedang berproduksi' : 'Idle'}
+          {proses === 'running' ? 'Sedang berproduksi' : proses === 'finished' ? 'Sesi selesai' : 'Idle'}
         </span>
       </Reveal>
 

@@ -1,7 +1,8 @@
-// Aturan health check — SATU sumber logika dengan frontend (client/src/lib/thresholds.js).
+// Aturan health check — SATU sumber logika dengan frontend (frontend/src/lib/thresholds.js).
+// Memantau suhu PIROLISIS & TUNGKU (kedua-duanya ditulis perangkat ke /monitoring).
 // Prinsip: makin panas → pembakaran makin sempurna → gas makin minim. Suhu dinilai
-// terhadap PITA target (bawah–atas). Suhu di luar pita = warning (tidak menghentikan);
-// gas terdeteksi = critical.
+// terhadap PITA target (bawah–atas) HANYA saat mesin berproses (running).
+// Suhu di luar pita = warning (tidak menghentikan); gas terdeteksi = critical.
 
 export const DEFAULT_SETPOINTS = {
   pirolisis: { bawah: 380, atas: 420 },

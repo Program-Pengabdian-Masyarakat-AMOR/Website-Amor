@@ -8,7 +8,7 @@ import { api } from '../../services/api';
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
 
-// Halaman Kontrol: nilai yang dikirim Web → IoT (via Firebase /input/...).
+// Halaman Kontrol: nilai yang dikirim Web → IoT (Firebase node input, key datar).
 export default function Kontrol() {
   const { data, loading, error, reload } = useApi(() => api.get('/control'), []);
   const { toast, toastProps } = useToast();
@@ -22,10 +22,7 @@ export default function Kontrol() {
 
   useEffect(() => {
     if (!data) return;
-    setForm({
-      pirolisis: { ...data.pirolisis },
-      tungku: { ...data.tungku },
-    });
+    setForm({ pirolisis: { ...data.pirolisis }, tungku: { ...data.tungku } });
     setBlower(Boolean(data.blower));
     setFeeder(Boolean(data.feeder));
   }, [data]);
@@ -73,14 +70,12 @@ export default function Kontrol() {
 
   async function toggle(nama, nilai) {
     setSwitching(nama);
-    // optimistik
     if (nama === 'blower') setBlower(nilai);
     else setFeeder(nilai);
     try {
       await api.put('/control/kontrol', { [nama]: nilai });
       toast(`${nama === 'blower' ? 'Blower' : 'Feeder'} ${nilai ? 'dinyalakan' : 'dimatikan'}.`);
     } catch {
-      // rollback
       if (nama === 'blower') setBlower(!nilai);
       else setFeeder(!nilai);
       toast('Gagal mengirim perintah.');
@@ -100,8 +95,8 @@ export default function Kontrol() {
           <path d="M11 12h1v4h1" />
         </svg>
         <p className="text-[13px] leading-[1.55] text-amber-teks">
-          Nilai di halaman ini <b>dikirim langsung ke mesin</b>. Pastikan setpoint sesuai kondisi
-          lapangan sebelum menyimpan.
+          Nilai di halaman ini <b>dikirim langsung ke mesin</b>. Pastikan sesuai kondisi lapangan
+          sebelum menyimpan/mengaktifkan.
         </p>
       </Reveal>
 
@@ -117,26 +112,12 @@ export default function Kontrol() {
               <div className="card-hd">
                 <div>
                   <h3 className="text-[16px] font-semibold">Setpoint suhu</h3>
-                  <div className="text-[13px] text-tinta-60">Batas bawah & atas pita target (°C)</div>
+                  <div className="text-[13px] text-tinta-60">Batas bawah &amp; atas pita target (°C)</div>
                 </div>
               </div>
               <div className="p-[22px] flex flex-col gap-6">
-                <SetpointGroup
-                  judul="Pirolisis (reaktor)"
-                  hint="Umumnya sekitar 400 °C"
-                  band={form.pirolisis}
-                  invalid={invalid}
-                  grup="pirolisis"
-                  onChange={setField}
-                />
-                <SetpointGroup
-                  judul="Tungku (pembakaran)"
-                  hint="Umumnya sekitar 800 °C"
-                  band={form.tungku}
-                  invalid={invalid}
-                  grup="tungku"
-                  onChange={setField}
-                />
+                <SetpointGroup judul="Pirolisis (reaktor)" hint="Umumnya sekitar 400 °C" band={form.pirolisis} invalid={invalid} grup="pirolisis" onChange={setField} />
+                <SetpointGroup judul="Tungku (pembakaran)" hint="Umumnya sekitar 800 °C" band={form.tungku} invalid={invalid} grup="tungku" onChange={setField} />
                 <div className="flex justify-end">
                   <button onClick={simpanSetpoint} disabled={saving} className="btn btn-primary px-5 py-[11px] text-[14.5px] disabled:opacity-70">
                     {saving ? 'Mengirim…' : 'Simpan setpoint'}
@@ -154,20 +135,8 @@ export default function Kontrol() {
                 </div>
               </div>
               <div className="p-[22px] flex flex-col gap-3">
-                <SwitchRow
-                  label="Blower"
-                  desc="Kipas pendorong udara pembakaran"
-                  on={blower}
-                  busy={switching === 'blower'}
-                  onToggle={(v) => toggle('blower', v)}
-                />
-                <SwitchRow
-                  label="Feeder"
-                  desc="Pengumpan bahan ke reaktor"
-                  on={feeder}
-                  busy={switching === 'feeder'}
-                  onToggle={(v) => toggle('feeder', v)}
-                />
+                <SwitchRow label="Blower" desc="Kipas pendorong udara pembakaran" on={blower} busy={switching === 'blower'} onToggle={(v) => toggle('blower', v)} />
+                <SwitchRow label="Feeder" desc="Pengumpan bahan ke reaktor" on={feeder} busy={switching === 'feeder'} onToggle={(v) => toggle('feeder', v)} />
               </div>
             </Reveal>
           </div>
@@ -186,7 +155,7 @@ function SetpointGroup({ judul, hint, band, invalid, grup, onChange }) {
         <span className="text-[14px] font-semibold">{judul}</span>
         <span className="text-[12px] text-tinta-40">{hint}</span>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 max-[420px]:grid-cols-1">
         {['bawah', 'atas'].map((sisi) => (
           <div key={sisi} className="flex flex-col gap-[7px]">
             <label className="text-[13px] text-tinta-60 capitalize">Batas {sisi}</label>

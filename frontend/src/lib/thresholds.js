@@ -1,21 +1,15 @@
-// Aturan health check (rule-based) — selaras kontrak IoT (Firebase).
-// Logika final ada di backend; mock & UI memakai aturan yang sama.
+// Aturan health check (rule-based) — memantau suhu PIROLISIS & TUNGKU.
+// SATU sumber logika dengan backend (backend/src/lib/thresholds.js).
 //
-// Prinsip proses: makin panas → pembakaran makin sempurna → gas makin minim.
-// Jadi RISIKO gas justru saat suhu TERLALU RENDAH, sementara suhu TERLALU TINGGI
-// berisiko overheat. Suhu dinilai terhadap PITA target (bawah–atas) dari halaman Kontrol.
-//
-// Severity:
-//   - Suhu di luar pita (rendah/tinggi) → 'warning' saja (CUKUP alert, proses TIDAK dihentikan).
-//   - Gas terdeteksi → 'critical' (bahaya nyata).
+// Prinsip: makin panas → pembakaran makin sempurna → gas makin minim. Suhu dinilai
+// terhadap PITA target (bawah–atas) HANYA saat mesin berproses (running).
+// Suhu di luar pita → warning (tidak menghentikan). Gas terdeteksi → critical.
 
-// Setpoint default (bisa dikalibrasi). Target baik: tungku ~800°C, pirolisis ~400°C.
 export const DEFAULT_SETPOINTS = {
   pirolisis: { bawah: 380, atas: 420 },
   tungku: { bawah: 780, atas: 820 },
 };
 
-/** Posisi satu nilai suhu terhadap pita target. */
 export function statusSuhu(nilai, band) {
   if (nilai == null || !band) return 'aman';
   if (nilai < band.bawah) return 'rendah';
@@ -23,10 +17,6 @@ export function statusSuhu(nilai, band) {
   return 'aman';
 }
 
-/**
- * Daftar alert dari telemetri terkini.
- * @returns {{tipe:string, severity:'warning'|'critical', pesan:string}[]}
- */
 export function hitungAlert({ suhuPirolisis, suhuTungku, statusGas, statusSistem, setpoint = DEFAULT_SETPOINTS } = {}) {
   const alerts = [];
 
@@ -51,10 +41,6 @@ export function hitungAlert({ suhuPirolisis, suhuTungku, statusGas, statusSistem
   return alerts;
 }
 
-/**
- * Status keseluruhan dari daftar alert.
- * Suhu (warning) TIDAK pernah menjadikan critical — hanya gas yang critical.
- */
 export function statusDariAlert(alerts = []) {
   if (alerts.some((a) => a.severity === 'critical')) return 'critical';
   if (alerts.length) return 'warning';
