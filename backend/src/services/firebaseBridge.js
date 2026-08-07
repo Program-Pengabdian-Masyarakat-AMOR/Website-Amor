@@ -2,16 +2,18 @@ import { getDb } from '../config/firebase.js';
 import { prisma } from '../lib/prisma.js';
 import { hitungAlert, statusDariAlert, DEFAULT_SETPOINTS } from '../lib/thresholds.js';
 
-const MAX_SERIES = 14;
+const MAX_LOG = 30; // simpan 30 titik rata-rata menit terakhir untuk grafik
 
 // --- State internal ---
 let latest = null; // telemetri terkini (bentuk yang dikirim ke FE)
-const series = [];
+let minuteSeries = []; // titik suhu rata-rata per 1 menit (untuk grafik)
+let acc = { pir: 0, tun: 0, berat: 0, n: 0 }; // akumulator menit berjalan
 let control = {
   pirolisis: { ...DEFAULT_SETPOINTS.pirolisis },
   tungku: { ...DEFAULT_SETPOINTS.tungku },
   blower: false,
   feeder: false,
+  alarm: true, // alarm gas aktif secara default
 };
 let db = null;
 let ioRef = null;
@@ -70,13 +72,31 @@ function schedulePush() {
 
 function push(t) {
   latest = t;
-  series.push(t);
-  if (series.length > MAX_SERIES) series.shift();
+  // Akumulasi untuk rata-rata suhu per menit (log grafik).
+  acc.pir += t.suhu_pirolisis;
+  acc.tun += t.suhu_tungku;
+  acc.berat += t.berat_sampah;
+  acc.n += 1;
   if (ioRef) {
-    ioRef.emit('sensor-update', t);
+    ioRef.emit('sensor-update', t); // instan (untuk kartu)
     ioRef.emit('health-update', buildHealth(t));
   }
   handleSessionTransition(t).catch((e) => console.error('[bridge] finalize sesi gagal:', e.message));
+}
+
+// Setiap 1 menit: catat 1 titik = rata-rata suhu selama menit itu.
+function flushMinuteLog() {
+  if (acc.n === 0) return;
+  const point = {
+    timestamp: new Date().toISOString(),
+    suhu_pirolisis: Math.round(acc.pir / acc.n),
+    suhu_tungku: Math.round(acc.tun / acc.n),
+    berat_sampah: Number((acc.berat / acc.n).toFixed(1)),
+  };
+  minuteSeries.push(point);
+  if (minuteSeries.length > MAX_LOG) minuteSeries.shift();
+  acc = { pir: 0, tun: 0, berat: 0, n: 0 };
+  if (ioRef) ioRef.emit('temp-log', point);
 }
 
 // Saat status masuk 'finished' (FINISH): catat production log + health + prediksi.
@@ -89,7 +109,7 @@ async function handleSessionTransition(t) {
   if (now === 'finished' && prev !== 'finished' && prev !== null) {
     const sampah = num(monitoring.berat_sampah_total_akhir) || num(monitoring.berat_sampah_total);
     const minyak = num(monitoring.berat_minyak_total_akhir) || num(monitoring.berat_minyak);
-    const waktu = Math.round(num(monitoring.waktu_proses));
+    const waktuMs = Math.round(num(monitoring.waktu_proses)); // IoT kirim MILIDETIK
     const yieldPct = sampah > 0 ? Number(((minyak / sampah) * 100).toFixed(1)) : 0;
     const sessionId = `SES-${Date.now()}`;
 
@@ -99,7 +119,7 @@ async function handleSessionTransition(t) {
         beratSampahTotal: sampah,
         beratMinyakTotal: minyak,
         yieldPercent: yieldPct,
-        waktuProsesDetik: waktu,
+        waktuProsesDetik: waktuMs, // kolom menyimpan milidetik
         suhuPirolisisAvg: t.suhu_pirolisis,
         suhuTungkuAvg: t.suhu_tungku,
       },
@@ -135,6 +155,7 @@ function inputToControl(input) {
     },
     blower: Boolean(input?.blower ?? input?.kontrol?.blower),
     feeder: Boolean(input?.feeder ?? input?.kontrol?.feeder),
+    alarm: input?.alarm !== false, // default aktif; false = dibisukan
   };
 }
 
@@ -143,7 +164,7 @@ export function getLatestTelemetry() {
   return latest || buildTelemetry();
 }
 export function getSeries() {
-  return series.slice();
+  return minuteSeries.slice();
 }
 export function getCurrentHealth() {
   return buildHealth(getLatestTelemetry());
@@ -167,11 +188,12 @@ export async function setSetpoint({ pirolisis, tungku }) {
   return control;
 }
 
-export async function setKontrol({ blower, feeder }) {
+export async function setKontrol({ blower, feeder, alarm }) {
   if (typeof blower === 'boolean') control.blower = blower;
   if (typeof feeder === 'boolean') control.feeder = feeder;
-  // Key datar sesuai gaya node input (input/blower, input/feeder).
-  if (db) await db.ref('input').update({ blower: control.blower, feeder: control.feeder });
+  if (typeof alarm === 'boolean') control.alarm = alarm;
+  // Key datar sesuai gaya node input (input/blower, input/feeder, input/alarm).
+  if (db) await db.ref('input').update({ blower: control.blower, feeder: control.feeder, alarm: control.alarm });
   return control;
 }
 
@@ -179,6 +201,9 @@ export async function setKontrol({ blower, feeder }) {
 export function initBridge(io) {
   ioRef = io;
   db = getDb();
+
+  // Catat rata-rata suhu tiap 1 menit (untuk grafik log suhu).
+  setInterval(flushMinuteLog, 60000);
 
   if (!db) {
     console.warn('[bridge] Firebase off — menjalankan simulator telemetri untuk dev.');

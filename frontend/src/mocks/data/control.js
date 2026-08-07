@@ -6,4 +6,5 @@ export const controlDefault = {
   tungku: { bawah: 780, atas: 820 },
   blower: false,
   feeder: false,
+  alarm: true, // alarm gas aktif; false = dibisukan
 };

@@ -47,8 +47,8 @@ router.put(
   '/kontrol',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { blower, feeder } = req.body || {};
-    res.json(await setKontrol({ blower, feeder }));
+    const { blower, feeder, alarm } = req.body || {};
+    res.json(await setKontrol({ blower, feeder, alarm }));
   })
 );
 

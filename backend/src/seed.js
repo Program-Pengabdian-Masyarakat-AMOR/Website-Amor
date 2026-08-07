@@ -83,7 +83,7 @@ async function main() {
       beratSampahTotal: sampah,
       beratMinyakTotal: minyak,
       yieldPercent: y(sampah, minyak),
-      waktuProsesDetik: waktu,
+      waktuProsesDetik: waktu * 1000, // kolom menyimpan MILIDETIK (pRows dalam detik)
       suhuPirolisisAvg: pir,
       suhuTungkuAvg: tun,
     })),

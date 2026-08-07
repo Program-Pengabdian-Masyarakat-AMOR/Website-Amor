@@ -26,7 +26,7 @@ monitoring/
   berat_sampah (number)  berat_minyak (number)  berat_sampah_total (number)
   status_gas (boolean)                  // true = gas terdeteksi
   status_sistem (string)                // "IDLE" | "PROCESS" | "FINISH"
-  berat_sampah_total_akhir (number)  berat_minyak_total_akhir (number)  waktu_proses (number, detik)
+  berat_sampah_total_akhir (number)  berat_minyak_total_akhir (number)  waktu_proses (number, MILIDETIK)
 ```
 Backend menormalkan `status_sistem`: `PROCESS→running`, `IDLE→idle`, `FINISH→finished`.
 Saat `FINISH`, backend mencatat log produksi dari field `*_akhir` + `waktu_proses`.
@@ -39,6 +39,7 @@ input/tungku_bawah      Integer
 input/tungku_atas       Integer
 input/blower            Boolean
 input/feeder            Boolean
+input/alarm             Boolean   (alarm gas: true=aktif, false=dibisukan)
 ```
 
 ---
@@ -53,17 +54,17 @@ input/feeder            Boolean
 ```
 
 ### production_logs (hasil akhir per sesi, saat FINISH)
-Field mentah dari `monitoring/`: `berat_sampah_total_akhir`, `berat_minyak_total_akhir`, `waktu_proses` (detik).
+Field mentah dari `monitoring/`: `berat_sampah_total_akhir`, `berat_minyak_total_akhir`, `waktu_proses` (milidetik).
 Field turunan backend: `session_id`, `yield_percent`, `suhu_pirolisis_avg`, `suhu_tungku_avg`, `created_at`.
 ```
 { id, session_id, berat_sampah_total, berat_minyak_total, yield_percent,
-  waktu_proses_detik, suhu_pirolisis_avg, suhu_tungku_avg, created_at }
+  waktu_proses_ms, suhu_pirolisis_avg, suhu_tungku_avg, created_at }
 ```
-Rumus: `yield_percent = (berat_minyak_total / berat_sampah_total) * 100`. UI menampilkan `waktu_proses_detik` sebagai menit.
+Rumus: `yield_percent = (berat_minyak_total / berat_sampah_total) * 100`. UI menampilkan `waktu_proses_ms` sebagai menit (÷60000).
 
 ### control (Web → IoT)
 ```
-{ pirolisis: { bawah, atas }, tungku: { bawah, atas }, blower: boolean, feeder: boolean }
+{ pirolisis: { bawah, atas }, tungku: { bawah, atas }, blower: boolean, feeder: boolean, alarm: boolean }
 ```
 
 ### health_status · predictions · members · oil_sales · users
@@ -81,7 +82,7 @@ Rumus: `yield_percent = (berat_minyak_total / berat_sampah_total) * 100`. UI men
 `POST /api/auth/login` · publik → `{ token, role }` (mock terima kombinasi valid apa pun) · `400 { message }` bila kosong.
 
 ### Telemetri & produksi (IoT → Web)
-- `GET /api/sensor-data/latest` → `{ latest: telemetri, series: telemetri[] }`
+- `GET /api/sensor-data/latest` → `{ latest: telemetri, series: titik[] }` (`series` = log suhu **rata-rata per 1 menit**, bukan telemetri instan)
 - `GET /api/production-logs` → `production_logs[]`
 - `POST /api/production-logs` → `201` objek tersimpan *(FASE 2: memicu prediksi ONNX + health)*
 
@@ -92,7 +93,7 @@ Rumus: `yield_percent = (berat_minyak_total / berat_sampah_total) * 100`. UI men
 ### Kontrol (Web → IoT)
 - `GET /api/control` → objek control saat ini (read-back)
 - `PUT /api/control/setpoint` body `{ pirolisis:{bawah,atas}, tungku:{bawah,atas} }` (integer) → setpoint terbaru (ditulis key datar ke Firebase)
-- `PUT /api/control/kontrol` body `{ blower?:boolean, feeder?:boolean }` → control terbaru (ditulis `input/blower`, `input/feeder`)
+- `PUT /api/control/kontrol` body `{ blower?:boolean, feeder?:boolean, alarm?:boolean }` → control terbaru (ditulis `input/blower`, `input/feeder`, `input/alarm`)
 
 ### Anggota & penjualan
 - `GET/POST /api/members` · `PUT/DELETE /api/members/:id`
@@ -107,8 +108,11 @@ Antarmuka `src/services/socket.js` identik `socket.io-client` (`on`/`off`/`emit`
 
 | Event | Payload |
 |---|---|
-| `sensor-update` | objek telemetri |
+| `sensor-update` | objek telemetri instan (untuk kartu sensor) |
 | `health-update` | `{ status, keterangan, ... }` dihitung dari `src/lib/thresholds.js` |
+| `temp-log` | 1 titik suhu **rata-rata per menit** `{ timestamp, suhu_pirolisis, suhu_tungku, berat_sampah }` (untuk grafik) |
+
+Timer proses berjalan dihitung di **sisi web** (mulai saat `status_sistem=running`), tidak dari Firebase.
 
 FASE 2: ganti util ini dengan `io(BASE_URL)`; event & bentuk payload tetap sama.
 

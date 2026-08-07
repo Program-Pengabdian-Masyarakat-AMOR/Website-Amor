@@ -41,17 +41,25 @@ export function formatTanggal(input) {
   });
 }
 
-/** Durasi dari detik → menit (dibulatkan), mis. 4320 → "72 mnt" */
-export function formatDurasiDetik(detik) {
-  if (detik == null || Number.isNaN(Number(detik))) return '—';
-  const menit = Math.round(Number(detik) / 60);
+/** Durasi dari MILIDETIK → menit (dibulatkan), mis. 4320000 → "72 mnt" */
+export function formatDurasiMs(ms) {
+  if (ms == null || Number.isNaN(Number(ms))) return '—';
+  const menit = Math.round(Number(ms) / 60000);
   return `${menit.toLocaleString('id-ID')} mnt`;
 }
 
-/** Detik → menit sebagai angka (untuk perhitungan). */
-export function menitDariDetik(detik) {
-  if (detik == null || Number.isNaN(Number(detik))) return 0;
-  return Math.round(Number(detik) / 60);
+/** Milidetik → menit sebagai angka (untuk perhitungan). */
+export function menitDariMs(ms) {
+  if (ms == null || Number.isNaN(Number(ms))) return 0;
+  return Math.round(Number(ms) / 60000);
+}
+
+/** Milidetik → "MM:SS" (untuk timer proses berjalan). */
+export function formatMmSs(ms) {
+  const total = Math.max(0, Math.floor(Number(ms) / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 /** Jam:menit WIB, mis. 10:42 */

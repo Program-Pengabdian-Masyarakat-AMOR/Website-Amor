@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import Topbar from '../../components/layout/Topbar';
 import SensorCard from '../../components/SensorCard';
 import DataTable from '../../components/DataTable';
@@ -8,12 +8,12 @@ import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import { statusSuhu } from '../../lib/thresholds';
-import { formatAngka, formatJam, formatTanggal, formatDurasiDetik, menitDariDetik } from '../../lib/format';
+import { formatAngka, formatJam, formatTanggal, formatDurasiMs, menitDariMs, formatMmSs } from '../../lib/format';
 
 const LineChart = lazy(() => import('../../components/LineChart'));
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
-const MAX_POINTS = 14;
+const MAX_POINTS = 30; // titik log suhu (rata-rata per menit)
 
 const sesiLabel = (id) => (id ? id.replace('SES-', '#') : '—');
 
@@ -30,34 +30,49 @@ export default function MonitoringLog() {
 
   const [current, setCurrent] = useState(null);
   const [serie, setSerie] = useState([]);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startRef = useRef(null);
+
+  const toPoint = (p) => ({ t: formatJam(p.timestamp), pirolisis: p.suhu_pirolisis, tungku: p.suhu_tungku, berat: p.berat_sampah });
 
   useEffect(() => {
     if (!sensor.data) return;
     setCurrent(sensor.data.latest);
-    setSerie(
-      (sensor.data.series || []).map((p) => ({
-        t: formatJam(p.timestamp),
-        pirolisis: p.suhu_pirolisis,
-        tungku: p.suhu_tungku,
-        berat: p.berat_sampah,
-      }))
-    );
+    setSerie((sensor.data.series || []).map(toPoint)); // titik rata-rata menit
   }, [sensor.data]);
 
   useEffect(() => {
     const socket = getSocket();
-    function onSensor(p) {
-      setCurrent(p);
-      setSerie((prev) =>
-        [...prev, { t: formatJam(p.timestamp), pirolisis: p.suhu_pirolisis, tungku: p.suhu_tungku, berat: p.berat_sampah }].slice(-MAX_POINTS)
-      );
-    }
+    // Kartu = telemetri instan; grafik = titik rata-rata per menit.
+    const onSensor = (p) => setCurrent(p);
+    const onTempLog = (p) => setSerie((prev) => [...prev, toPoint(p)].slice(-MAX_POINTS));
     socket.on('sensor-update', onSensor);
-    return () => socket.off('sensor-update', onSensor);
+    socket.on('temp-log', onTempLog);
+    return () => {
+      socket.off('sensor-update', onSensor);
+      socket.off('temp-log', onTempLog);
+    };
   }, []);
 
   const sesi = produksi.data?.[0];
   const proses = current?.status_sistem || 'idle';
+
+  // Timer proses sisi-web (mulai saat status jadi running; tidak dari Firebase).
+  useEffect(() => {
+    if (proses === 'running') {
+      if (startRef.current == null) startRef.current = Date.now();
+    } else {
+      startRef.current = null;
+      setElapsedMs(0);
+    }
+  }, [proses]);
+  useEffect(() => {
+    if (proses !== 'running') return;
+    const id = setInterval(() => {
+      if (startRef.current != null) setElapsedMs(Date.now() - startRef.current);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [proses]);
   const sp = kontrol.data;
 
   const gasTerdeteksi = current?.status_gas === true;
@@ -81,7 +96,7 @@ export default function MonitoringLog() {
     { key: 'yield', header: 'Yield (%)', align: 'right', render: (r) => <span className={`font-semibold tnum ${yieldTone(r.yield_percent)}`}>{formatAngka(r.yield_percent)}</span> },
     { key: 'pir', header: 'Pirolisis (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_pirolisis_avg) },
     { key: 'tun', header: 'Tungku (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_tungku_avg) },
-    { key: 'durasi', header: 'Durasi (mnt)', align: 'right', cellClass: 'tnum font-medium', render: (r) => menitDariDetik(r.waktu_proses_detik) },
+    { key: 'durasi', header: 'Durasi (mnt)', align: 'right', cellClass: 'tnum font-medium', render: (r) => menitDariMs(r.waktu_proses_ms) },
   ];
 
   const rows = produksi.data || [];
@@ -94,7 +109,7 @@ export default function MonitoringLog() {
         { content: <b>{formatAngka(avg('yield_percent'))}</b>, align: 'right', className: 'tnum' },
         { content: <b>{formatAngka(avg('suhu_pirolisis_avg'))}</b>, align: 'right', className: 'tnum' },
         { content: <b>{formatAngka(avg('suhu_tungku_avg'))}</b>, align: 'right', className: 'tnum' },
-        { content: <b>{menitDariDetik(avg('waktu_proses_detik'))}</b>, align: 'right', className: 'tnum' },
+        { content: <b>{menitDariMs(avg('waktu_proses_ms'))}</b>, align: 'right', className: 'tnum' },
       ]
     : undefined;
 
@@ -117,7 +132,11 @@ export default function MonitoringLog() {
         </span>
         <span className="w-px h-[26px] bg-border" />
         <span className="text-[13px] text-tinta-60">
-          Durasi <b className="text-tinta font-semibold tnum">{sesi ? formatDurasiDetik(sesi.waktu_proses_detik) : '—'}</b>
+          {proses === 'running' ? (
+            <>Berjalan <b className="text-tinta font-semibold tnum">{formatMmSs(elapsedMs)}</b></>
+          ) : (
+            <>Durasi terakhir <b className="text-tinta font-semibold tnum">{sesi ? formatDurasiMs(sesi.waktu_proses_ms) : '—'}</b></>
+          )}
         </span>
         <span className={`ml-auto inline-flex items-center gap-2 text-[12.5px] font-semibold rounded-full px-[13px] py-[6px] border ${proses === 'running' ? 'text-normal-teks bg-normal-bg border-[#CFE0C8]' : 'text-tinta-60 bg-permukaan-2 border-border'}`}>
           {proses === 'running' && <span className="live-dot" />}

@@ -27,7 +27,7 @@ export const productionDTO = (p) => ({
   berat_sampah_total: p.beratSampahTotal,
   berat_minyak_total: p.beratMinyakTotal,
   yield_percent: p.yieldPercent,
-  waktu_proses_detik: p.waktuProsesDetik,
+  waktu_proses_ms: p.waktuProsesDetik, // kolom menyimpan MILIDETIK (dari IoT)
   suhu_pirolisis_avg: p.suhuPirolisisAvg,
   suhu_tungku_avg: p.suhuTungkuAvg,
   created_at: p.createdAt,

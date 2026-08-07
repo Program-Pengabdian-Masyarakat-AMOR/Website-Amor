@@ -84,6 +84,7 @@ export const handlers = [
     const body = await request.json();
     if (typeof body.blower === 'boolean') control.blower = body.blower;
     if (typeof body.feeder === 'boolean') control.feeder = body.feeder;
+    if (typeof body.alarm === 'boolean') control.alarm = body.alarm;
     return HttpResponse.json(control);
   }),
 

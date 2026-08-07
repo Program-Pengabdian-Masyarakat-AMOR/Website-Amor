@@ -18,6 +18,7 @@ export default function Kontrol() {
   const [saving, setSaving] = useState(false);
   const [blower, setBlower] = useState(false);
   const [feeder, setFeeder] = useState(false);
+  const [alarm, setAlarm] = useState(true);
   const [switching, setSwitching] = useState(null);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function Kontrol() {
     setForm({ pirolisis: { ...data.pirolisis }, tungku: { ...data.tungku } });
     setBlower(Boolean(data.blower));
     setFeeder(Boolean(data.feeder));
+    setAlarm(data.alarm !== false); // default aktif
   }, [data]);
 
   function setField(grup, sisi, nilai) {
@@ -68,16 +70,17 @@ export default function Kontrol() {
     }
   }
 
+  const setters = { blower: setBlower, feeder: setFeeder, alarm: setAlarm };
+  const labels = { blower: 'Blower', feeder: 'Feeder', alarm: 'Alarm gas' };
+
   async function toggle(nama, nilai) {
     setSwitching(nama);
-    if (nama === 'blower') setBlower(nilai);
-    else setFeeder(nilai);
+    setters[nama](nilai); // optimistik
     try {
       await api.put('/control/kontrol', { [nama]: nilai });
-      toast(`${nama === 'blower' ? 'Blower' : 'Feeder'} ${nilai ? 'dinyalakan' : 'dimatikan'}.`);
+      toast(`${labels[nama]} ${nilai ? 'diaktifkan' : 'dinonaktifkan'}.`);
     } catch {
-      if (nama === 'blower') setBlower(!nilai);
-      else setFeeder(!nilai);
+      setters[nama](!nilai); // rollback
       toast('Gagal mengirim perintah.');
     } finally {
       setSwitching(null);
@@ -137,6 +140,7 @@ export default function Kontrol() {
               <div className="p-[22px] flex flex-col gap-3">
                 <SwitchRow label="Blower" desc="Kipas pendorong udara pembakaran" on={blower} busy={switching === 'blower'} onToggle={(v) => toggle('blower', v)} />
                 <SwitchRow label="Feeder" desc="Pengumpan bahan ke reaktor" on={feeder} busy={switching === 'feeder'} onToggle={(v) => toggle('feeder', v)} />
+                <SwitchRow label="Alarm gas" desc="Bunyikan alarm saat gas terdeteksi (matikan untuk membisukan)" on={alarm} busy={switching === 'alarm'} onToggle={(v) => toggle('alarm', v)} />
               </div>
             </Reveal>
           </div>

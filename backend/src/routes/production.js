@@ -30,7 +30,7 @@ router.post(
         beratSampahTotal: sampah,
         beratMinyakTotal: minyak,
         yieldPercent: b.yield_percent != null ? Number(b.yield_percent) : sampah > 0 ? Number(((minyak / sampah) * 100).toFixed(1)) : 0,
-        waktuProsesDetik: Math.round(Number(b.waktu_proses_detik) || 0),
+        waktuProsesDetik: Math.round(Number(b.waktu_proses_ms) || 0), // kolom = milidetik
         suhuPirolisisAvg: b.suhu_pirolisis_avg != null ? Number(b.suhu_pirolisis_avg) : null,
         suhuTungkuAvg: b.suhu_tungku_avg != null ? Number(b.suhu_tungku_avg) : null,
       },
