@@ -10,7 +10,13 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:studio": "prisma studio",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "prisma:deploy": "prisma migrate deploy",
+    "ai:data": "python ../ai/run_all_generators.py",
+    "ai:train": "python ../ai/scripts/train_all.py",
+    "ai:evaluate": "python ../ai/scripts/evaluate_all.py",
+    "ai:deploy": "python ../ai/scripts/deploy_to_backend.py",
+    "ai:bootstrap-models": "python scripts/generate-bootstrap-onnx.py"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
@@ -20,7 +26,8 @@
     "express": "^4.19.2",
     "firebase-admin": "^12.4.0",
     "jsonwebtoken": "^9.0.2",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "onnxruntime-node": "^1.27.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4",
