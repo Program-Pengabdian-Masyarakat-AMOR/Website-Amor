@@ -63,3 +63,15 @@ model Prediction {
   predictedYield Float?
   actualYield   Float?
 }
+
+model FeederMovement {
+  id           Int      @id @default(autoincrement())
+  action       String   // on | off
+  source       String   // manual | ai | interlock
+  reason       String
+  suhuPirolisis Float?
+  suhuTungku    Float?
+  beratSampah   Float?
+  aiScore       Float?
+  createdAt    DateTime @default(now())
+}
