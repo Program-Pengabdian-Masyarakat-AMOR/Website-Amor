@@ -7,6 +7,8 @@ import health from './health.js';
 import predictions from './predictions.js';
 import members from './members.js';
 import sales from './sales.js';
+import feederLogs from './feederLogs.js';
+import ai from './ai.js';
 
 const router = Router();
 
@@ -20,5 +22,7 @@ router.use('/health-status', health);
 router.use('/predictions', predictions);
 router.use('/members', members);
 router.use('/sales', sales);
+router.use('/feeder-logs', feederLogs);
+router.use('/ai', ai);
 
 export default router;
