@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { productionDTO } from '../lib/serializers.js';
+import { upsertPrediction, upsertSessionHealth, refreshMonthlyHealth } from '../services/productionAi.js';
 
 const router = Router();
 
@@ -35,6 +36,19 @@ router.post(
         suhuTungkuAvg: b.suhu_tungku_avg != null ? Number(b.suhu_tungku_avg) : null,
       },
     });
+    await Promise.all([
+      upsertPrediction({
+        sessionId: row.sessionId,
+        actualYield: row.yieldPercent,
+        inputKg: row.beratSampahTotal,
+        outputKg: row.beratMinyakTotal,
+        elapsedMs: row.waktuProsesDetik,
+        pyroAvg: row.suhuPirolisisAvg,
+        furnaceAvg: row.suhuTungkuAvg,
+      }),
+      upsertSessionHealth({ sessionId: row.sessionId, pyroAvg: row.suhuPirolisisAvg, furnaceAvg: row.suhuTungkuAvg }),
+    ]);
+    await refreshMonthlyHealth(row.createdAt);
     res.status(201).json(productionDTO(row));
   })
 );
