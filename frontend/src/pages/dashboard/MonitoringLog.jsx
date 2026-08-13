@@ -27,10 +27,12 @@ export default function MonitoringLog() {
   const sensor = useApi(() => api.get('/sensor-data/latest'), []);
   const produksi = useApi(() => api.get('/production-logs'), []);
   const kontrol = useApi(() => api.get('/control'), []);
+  const feederLog = useApi(() => api.get('/feeder-logs?limit=50'), []);
 
   const [current, setCurrent] = useState(null);
   const [serie, setSerie] = useState([]);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [feederRows, setFeederRows] = useState([]);
   const startRef = useRef(null);
 
   const toPoint = (p) => ({ t: formatJam(p.timestamp), pirolisis: p.suhu_pirolisis, tungku: p.suhu_tungku, berat: p.berat_sampah });
@@ -42,15 +44,22 @@ export default function MonitoringLog() {
   }, [sensor.data]);
 
   useEffect(() => {
+    if (feederLog.data) setFeederRows(feederLog.data);
+  }, [feederLog.data]);
+
+  useEffect(() => {
     const socket = getSocket();
     // Kartu = telemetri instan; grafik = titik rata-rata per menit.
     const onSensor = (p) => setCurrent(p);
     const onTempLog = (p) => setSerie((prev) => [...prev, toPoint(p)].slice(-MAX_POINTS));
+    const onFeeder = (p) => setFeederRows((prev) => [p, ...prev].slice(0, 50));
     socket.on('sensor-update', onSensor);
     socket.on('temp-log', onTempLog);
+    socket.on('feeder-movement', onFeeder);
     return () => {
       socket.off('sensor-update', onSensor);
       socket.off('temp-log', onTempLog);
+      socket.off('feeder-movement', onFeeder);
     };
   }, []);
 
@@ -97,6 +106,25 @@ export default function MonitoringLog() {
     { key: 'pir', header: 'Pirolisis (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_pirolisis_avg) },
     { key: 'tun', header: 'Tungku (°C)', align: 'right', cellClass: 'tnum font-medium', render: (r) => formatAngka(r.suhu_tungku_avg) },
     { key: 'durasi', header: 'Durasi (mnt)', align: 'right', cellClass: 'tnum font-medium', render: (r) => menitDariMs(r.waktu_proses_ms) },
+  ];
+
+  const feederColumns = [
+    {
+      key: 'waktu',
+      header: 'Waktu',
+      render: (r) => <span className="text-tinta-40 text-[12.5px] whitespace-nowrap">{formatTanggal(r.created_at)} · {formatJam(r.created_at)}</span>,
+    },
+    {
+      key: 'gerak',
+      header: 'Feeder',
+      render: (r) => <span className={`badge ${r.action === 'on' ? 'b-normal' : 'b-warning'}`}><span className="pip" />{String(r.action || '').toUpperCase()}</span>,
+    },
+    { key: 'sumber', header: 'Sumber', render: (r) => <span className="font-medium capitalize">{r.source}</span> },
+    { key: 'pirlog', header: 'Pirolisis (°C)', align: 'right', cellClass: 'tnum', render: (r) => formatAngka(r.suhu_pirolisis) },
+    { key: 'tunlog', header: 'Tungku (°C)', align: 'right', cellClass: 'tnum', render: (r) => formatAngka(r.suhu_tungku) },
+    { key: 'sampahlog', header: 'Sampah (kg)', align: 'right', cellClass: 'tnum', render: (r) => formatAngka(r.berat_sampah) },
+    { key: 'score', header: 'AI score', align: 'right', cellClass: 'tnum', render: (r) => r.ai_score == null ? '—' : `${Math.round(Number(r.ai_score) * 100)}%` },
+    { key: 'alasan', header: 'Alasan', render: (r) => <span className="text-tinta-60 text-[13px]">{r.reason}</span> },
   ];
 
   const rows = produksi.data || [];
@@ -252,6 +280,23 @@ export default function MonitoringLog() {
           loading={produksi.loading}
           error={produksi.error}
           emptyMessage="Belum ada sesi produksi."
+        />
+      </Reveal>
+
+      {/* Log feeder: satu baris untuk setiap perubahan ON/OFF, manual maupun AI. */}
+      <Reveal delay={150} className="card mt-6">
+        <div className="card-hd">
+          <div>
+            <h3 className="text-[16px] font-semibold">Log pergerakan feeder</h3>
+            <div className="text-[13px] text-tinta-60">Terhubung ke perintah IoT · update real-time</div>
+          </div>
+        </div>
+        <DataTable
+          columns={feederColumns}
+          rows={feederRows}
+          loading={feederLog.loading}
+          error={feederLog.error}
+          emptyMessage="Belum ada pergerakan feeder."
         />
       </Reveal>
     </>
