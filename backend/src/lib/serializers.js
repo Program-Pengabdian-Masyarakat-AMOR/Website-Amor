@@ -47,3 +47,15 @@ export const predictionDTO = (p) => ({
   predicted_yield: p.predictedYield,
   actual_yield: p.actualYield,
 });
+
+export const feederMovementDTO = (m) => ({
+  id: m.id,
+  action: m.action,
+  source: m.source,
+  reason: m.reason,
+  suhu_pirolisis: m.suhuPirolisis,
+  suhu_tungku: m.suhuTungku,
+  berat_sampah: m.beratSampah,
+  ai_score: m.aiScore,
+  created_at: m.createdAt,
+});
