@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { initBridge } from './services/firebaseBridge.js';
+import { warmupAiEngine } from './services/aiEngine.js';
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -31,6 +32,7 @@ io.on('connection', (socket) => {
 
 // Jembatan Firebase → emit 'sensor-update' & 'health-update' ke semua klien.
 initBridge(io);
+warmupAiEngine().catch((e) => console.error('[ai] warmup gagal:', e.message));
 
 httpServer.listen(env.port, () => {
   console.log(`[server] AMOR backend jalan di http://localhost:${env.port}`);
