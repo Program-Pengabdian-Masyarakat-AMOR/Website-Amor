@@ -1,0 +1,99 @@
+{
+  "generated_at": "2026-08-13T12:13:19.691572+00:00",
+  "provenance": "trained_on_small_synthetic_reference_informed_dataset",
+  "rows": {
+    "yield": 50,
+    "feeder": 50,
+    "monthlyHealth": 50
+  },
+  "target_reactor_c": 400,
+  "backend_contract": {
+    "yield": {
+      "features": [
+        "input_mass_norm",
+        "pyro_quality",
+        "furnace_quality",
+        "progress",
+        "projected_recovery",
+        "running_flag"
+      ],
+      "onnx": "yield_predictor.onnx"
+    },
+    "feeder": {
+      "features": [
+        "pyro_error_norm",
+        "furnace_heat_norm",
+        "waste_ratio",
+        "gas_flag",
+        "running_flag"
+      ],
+      "onnx": "feeder_policy.onnx"
+    },
+    "monthlyHealth": {
+      "features": [
+        "pyro_quality",
+        "furnace_quality",
+        "yield_quality",
+        "yield_cv",
+        "critical_rate",
+        "session_count_norm"
+      ],
+      "onnx": "monthly_health.onnx"
+    }
+  },
+  "metrics": {
+    "yield": {
+      "validation": {
+        "mae": 1.842120743520142,
+        "rmse": 1.9865064762056397,
+        "r2": 0.6799676415828807
+      },
+      "test": {
+        "mae": 1.1108710232974852,
+        "rmse": 1.2337081199281579,
+        "r2": 0.5829980200434906
+      }
+    },
+    "feeder": {
+      "validation": {
+        "accuracy": 0.8571428571428571,
+        "precision": 0.6666666666666666,
+        "recall": 1.0,
+        "f1": 0.8,
+        "threshold": 0.5
+      },
+      "test": {
+        "accuracy": 0.875,
+        "precision": 0.75,
+        "recall": 1.0,
+        "f1": 0.8571428571428571,
+        "threshold": 0.5
+      }
+    },
+    "monthlyHealth": {
+      "validation": {
+        "accuracy": 0.8571428571428571,
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571428571428571,
+        "threshold": 0.5
+      },
+      "test": {
+        "accuracy": 0.75,
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8,
+        "threshold": 0.5
+      }
+    }
+  },
+  "warning": "Synthetic model only. Re-train and re-evaluate on real AMOR telemetry before relying on AUTO for process control.",
+  "deployed_at": "2026-08-13T12:14:16.280757+00:00",
+  "evaluation_passed": true,
+  "sha256": {
+    "yield_predictor.onnx": "cf7b0e427b72e2c64633ce77077b1ce2199c01bcd7706b99ce0361b0d434f97d",
+    "feeder_policy.onnx": "3dc6e314702a3d029130bcc6cb131269d6606d15c35208a28e85ca1a819b809d",
+    "monthly_health.onnx": "576d7ea955c8d2df9294da96da83983f10c37073ee2f0e0dd9ccc8343a5380c0"
+  },
+  "deployment_note": "Restart backend or reload AI sessions after replacing models."
+}
