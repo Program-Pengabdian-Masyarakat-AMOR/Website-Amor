@@ -42,6 +42,7 @@ let ortLoadPromise = null;
 
 const sessions = new Map();
 const failures = new Map();
+const sessionPromises = new Map();
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
@@ -119,24 +120,55 @@ function readModelManifest() {
 }
 
 async function getSession(kind) {
-  if (sessions.has(kind)) return sessions.get(kind);
-  const runtime = await loadOrt();
-  if (!runtime) return null;
-  const path = modelPath(kind);
-  if (!existsSync(path)) {
-    failures.set(kind, `Model tidak ditemukan: ${path}`);
-    return null;
+  // Session sudah tersedia.
+  if (sessions.has(kind)) {
+    return sessions.get(kind);
   }
-  try {
-    const session = await runtime.InferenceSession.create(path, { executionProviders: ['cpu'] });
-    sessions.set(kind, session);
-    console.log(`[ai] model ${kind} dimuat: ${path}`);
-    return session;
-  } catch (e) {
-    failures.set(kind, e.message);
-    console.error(`[ai] gagal memuat model ${kind}:`, e.message);
-    return null;
+
+  // Session yang sama sedang dibuat oleh request lain.
+  // Tunggu Promise yang sama agar tidak membuat beberapa
+  // InferenceSession secara paralel.
+  if (sessionPromises.has(kind)) {
+    return sessionPromises.get(kind);
   }
+
+  const promise = (async () => {
+    const runtime = await loadOrt();
+    if (!runtime) return null;
+
+    const path = modelPath(kind);
+
+    if (!existsSync(path)) {
+      failures.set(kind, `Model tidak ditemukan: ${path}`);
+      return null;
+    }
+
+    try {
+      const session = await runtime.InferenceSession.create(path, {
+        executionProviders: ['cpu'],
+      });
+
+      sessions.set(kind, session);
+      failures.delete(kind);
+
+      console.log(`[ai] model ${kind} dimuat: ${path}`);
+
+      return session;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+
+      failures.set(kind, message);
+      console.error(`[ai] gagal memuat model ${kind}:`, message);
+
+      return null;
+    } finally {
+      sessionPromises.delete(kind);
+    }
+  })();
+
+  sessionPromises.set(kind, promise);
+
+  return promise;
 }
 
 async function infer(kind, features) {
