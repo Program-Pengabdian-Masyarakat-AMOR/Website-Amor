@@ -44,9 +44,15 @@ model ProductionLog {
   beratMinyakTotal  Float
   yieldPercent      Float
   waktuProsesDetik  Int
-  suhuPirolisisAvg  Float?
-  suhuTungkuAvg     Float?
-  createdAt         DateTime @default(now())
+  suhuPirolisisAvg       Float?
+  suhuTungkuAvg          Float?
+  suhuPirolisisFiltered  Float?
+  suhuTungkuFiltered     Float?
+  pirolisisSetpointBawah Float?
+  pirolisisSetpointAtas  Float?
+  tungkuSetpointBawah    Float?
+  tungkuSetpointAtas     Float?
+  createdAt              DateTime @default(now())
 }
 
 model HealthStatus {

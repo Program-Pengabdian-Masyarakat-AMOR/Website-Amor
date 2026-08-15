@@ -3,7 +3,25 @@ import { predictYield } from './aiEngine.js';
 import { hitungAlert, statusDariAlert, DEFAULT_SETPOINTS } from '../lib/thresholds.js';
 import { evaluateMonthlyHealth, currentMonthKey } from './monthlyHealth.js';
 
-export async function upsertPrediction({ sessionId, actualYield, inputKg, outputKg, elapsedMs, pyroAvg, furnaceAvg, predictedYield = null } = {}) {
+function validBand(band, fallback) {
+  const low = Number(band?.bawah);
+  const high = Number(band?.atas);
+  if (Number.isFinite(low) && Number.isFinite(high) && high > low) return { bawah: low, atas: high };
+  return { ...fallback };
+}
+
+export async function upsertPrediction({
+  sessionId,
+  actualYield,
+  inputKg,
+  outputKg,
+  elapsedMs,
+  pyroAvg,
+  furnaceAvg,
+  pyroBand = DEFAULT_SETPOINTS.pirolisis,
+  furnaceBand = DEFAULT_SETPOINTS.tungku,
+  predictedYield = null,
+} = {}) {
   let prediction = predictedYield;
   let engine = 'live';
   if (!Number.isFinite(Number(prediction))) {
@@ -12,6 +30,8 @@ export async function upsertPrediction({ sessionId, actualYield, inputKg, output
       oilKg: outputKg,
       pyroC: pyroAvg,
       furnaceC: furnaceAvg,
+      pyroBand: validBand(pyroBand, DEFAULT_SETPOINTS.pirolisis),
+      furnaceBand: validBand(furnaceBand, DEFAULT_SETPOINTS.tungku),
       elapsedMs,
       running: false,
     });
@@ -27,16 +47,29 @@ export async function upsertPrediction({ sessionId, actualYield, inputKg, output
   return { row, engine };
 }
 
-export async function upsertSessionHealth({ sessionId, pyroAvg, furnaceAvg, gasDetected = false } = {}) {
+export async function upsertSessionHealth({
+  sessionId,
+  pyroAvg,
+  furnaceAvg,
+  pyroBand = DEFAULT_SETPOINTS.pirolisis,
+  furnaceBand = DEFAULT_SETPOINTS.tungku,
+  gasDetected = false,
+} = {}) {
+  const setpoint = {
+    pirolisis: validBand(pyroBand, DEFAULT_SETPOINTS.pirolisis),
+    tungku: validBand(furnaceBand, DEFAULT_SETPOINTS.tungku),
+  };
   const alerts = hitungAlert({
     suhuPirolisis: Number(pyroAvg),
     suhuTungku: Number(furnaceAvg),
     statusGas: gasDetected === true,
     statusSistem: 'running',
-    setpoint: DEFAULT_SETPOINTS,
+    setpoint,
   });
   const status = statusDariAlert(alerts);
-  const keterangan = alerts.length ? alerts.map((a) => a.pesan).join('; ') : 'Sesi selesai dalam batas aman.';
+  const keterangan = alerts.length
+    ? alerts.map((a) => a.pesan).join('; ')
+    : `Sesi selesai dalam pita aktif: pirolisis ${setpoint.pirolisis.bawah}–${setpoint.pirolisis.atas}°C, tungku ${setpoint.tungku.bawah}–${setpoint.tungku.atas}°C.`;
   const existing = await prisma.healthStatus.findFirst({ where: { sessionId }, orderBy: { id: 'desc' } });
   return existing
     ? prisma.healthStatus.update({ where: { id: existing.id }, data: { status, keterangan } })

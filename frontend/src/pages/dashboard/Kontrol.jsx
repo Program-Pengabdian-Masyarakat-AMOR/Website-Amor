@@ -11,8 +11,8 @@ import { getSocket } from '../../services/socket';
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
 const AI_MODES = [
   { key: 'off', label: 'OFF', desc: 'AI feeder tidak melakukan inferensi/gerak otomatis.' },
-  { key: 'observe', label: 'OBSERVE', desc: 'AI memberi rekomendasi dan log, tanpa menulis aktuator.' },
-  { key: 'auto', label: 'AUTO', desc: 'AI dapat memberi pulse feeder fisik setelah seluruh interlock aman.' },
+  { key: 'observe', label: 'OBSERVE', desc: 'ONNX + lightweight MPC menghitung rekomendasi dinamis tanpa menulis aktuator.' },
+  { key: 'auto', label: 'AUTO', desc: 'ONNX + MPC dapat memilih durasi pulse feeder setelah seluruh guard aman.' },
 ];
 
 // Halaman Kontrol: nilai yang dikirim Web → IoT (Firebase node input, key datar).
@@ -91,7 +91,7 @@ export default function Kontrol() {
     };
     try {
       await api.put('/control/setpoint', payload);
-      toast('Setpoint suhu dikirim ke mesin.');
+      toast('Setpoint dikirim. Target AI feeder, yield, dan health langsung mengikuti pita baru.');
       await reload();
     } catch {
       toast('Gagal mengirim setpoint. Coba lagi.');
@@ -144,6 +144,10 @@ export default function Kontrol() {
       return;
     }
     if (next === 'auto') {
+      if (aiFeeder?.model_envelope?.valid === false) {
+        toast(aiFeeder.model_envelope.issue || 'Setpoint berada di luar envelope model AUTO.');
+        return;
+      }
       setAutoDialog(true);
       return;
     }
@@ -162,7 +166,7 @@ export default function Kontrol() {
         </svg>
         <p className="text-[13px] leading-[1.55] text-amber-teks">
           Nilai di halaman ini <b>dikirim langsung ke mesin</b>. Mode <b>OBSERVE</b> tidak menggerakkan feeder,
-          sedangkan <b>AUTO</b> dapat menggerakkan feeder fisik setelah lolos interlock keselamatan.
+          sedangkan <b>AUTO</b> dapat menggerakkan feeder fisik setelah lolos interlock. Setpoint yang Anda simpan menjadi target dinamis untuk <b>ONNX + lightweight MPC</b>, prediksi yield, dan health check.
         </p>
       </Reveal>
 
@@ -182,8 +186,8 @@ export default function Kontrol() {
                 </div>
               </div>
               <div className="p-[22px] flex flex-col gap-6">
-                <SetpointGroup judul="Pirolisis (reaktor)" hint="Target operasi sekitar 400 °C" band={form.pirolisis} invalid={invalid} grup="pirolisis" onChange={setField} />
-                <SetpointGroup judul="Tungku (pembakaran)" hint="Menyesuaikan kebutuhan panas reaktor" band={form.tungku} invalid={invalid} grup="tungku" onChange={setField} />
+                <SetpointGroup judul="Pirolisis (reaktor)" hint="Target AI = titik tengah pita yang Anda pilih" band={form.pirolisis} invalid={invalid} grup="pirolisis" onChange={setField} />
+                <SetpointGroup judul="Tungku (pembakaran)" hint="Target AI mengikuti pita tungku aktif" band={form.tungku} invalid={invalid} grup="tungku" onChange={setField} />
                 <div className="flex justify-end">
                   <button onClick={simpanSetpoint} disabled={saving} className="btn btn-primary px-5 py-[11px] text-[14.5px] disabled:opacity-70">
                     {saving ? 'Mengirim…' : 'Simpan setpoint'}
@@ -211,8 +215,8 @@ export default function Kontrol() {
             <Reveal delay={130} className="card col-span-2 max-[1080px]:col-span-1">
               <div className="card-hd">
                 <div>
-                  <h3 className="text-[16px] font-semibold">AI Feeder · ONNX</h3>
-                  <div className="text-[13px] text-tinta-60">OBSERVE untuk pengumpulan data; AUTO tersedia untuk aktuasi mesin fisik</div>
+                  <h3 className="text-[16px] font-semibold">AI Feeder · ONNX + Lightweight MPC</h3>
+                  <div className="text-[13px] text-tinta-60">Setpoint-aware: model menilai kondisi relatif terhadap pita aktif, MPC memilih HOLD / durasi pulse</div>
                 </div>
                 <ModeBadge mode={aiFeeder?.mode || 'observe'} />
               </div>
@@ -245,9 +249,9 @@ export default function Kontrol() {
                   </div>
 
                   <div className="mt-4 text-[12.5px] text-tinta-60 leading-[1.6]">
-                    <b>Interlock AUTO:</b> mesin harus running, gas tidak terdeteksi, suhu pirolisis di bawah cutoff,
-                    suhu tungku berada pada rentang aman, cooldown selesai, dan tidak ada manual override aktif.
-                    Saat berpindah ke AUTO, backend lebih dulu memastikan feeder berada pada baseline OFF.
+                    <b>Guard AUTO:</b> mesin harus running, gas tidak terdeteksi, suhu berada di pita user sekaligus batas hardware,
+                    setpoint masih berada dalam envelope model, cooldown selesai, dan tidak ada manual override.
+                    ONNX memberi probabilitas feed; lightweight MPC memproyeksikan tren suhu lalu memilih HOLD, ½ pulse, atau full pulse.
                   </div>
                   {role !== 'admin' && (
                     <div className="mt-3 text-[12.5px] text-amber-teks bg-amber-lembut border border-[#EAC9AE] rounded-md px-3 py-2">
@@ -277,17 +281,35 @@ export default function Kontrol() {
 
 function AiDecisionPanel({ ai }) {
   const d = ai?.last_decision;
+  const p = ai?.dynamic_setpoint?.pirolisis;
+  const f = ai?.dynamic_setpoint?.tungku;
+  const mpc = d?.mpc;
+  const envelope = ai?.model_envelope;
   return (
     <div className="border border-border rounded-md bg-latar px-4 py-4">
-      <div className="text-[13px] font-semibold mb-3">Status AI feeder</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[12.5px]">
-        <Metric label="Target pirolisis" value={`${ai?.pyro_target_c ?? 400} °C`} />
-        <Metric label="Cutoff pirolisis" value={`${ai?.pyro_high_cutoff_c ?? 415} °C`} />
-        <Metric label="Tungku aman" value={`${ai?.min_furnace_c ?? '—'}–${ai?.max_furnace_c ?? '—'} °C`} />
-        <Metric label="Threshold AI" value={ai?.threshold != null ? Number(ai.threshold).toFixed(2) : '—'} />
-        <Metric label="Pulse" value={ai?.pulse_ms != null ? `${(ai.pulse_ms / 1000).toFixed(1)} s` : '—'} />
-        <Metric label="Cooldown" value={ai?.cooldown_ms != null ? `${(ai.cooldown_ms / 1000).toFixed(0)} s` : '—'} />
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="text-[13px] font-semibold">Status AI feeder dinamis</div>
+        {envelope && (
+          <span className={`rounded-full px-2 py-[3px] text-[10.5px] font-bold ${envelope.valid ? 'bg-normal-bg text-normal-teks' : 'bg-warning-bg text-warning-teks'}`}>
+            {envelope.valid ? 'IN ENVELOPE' : 'OUT OF ENVELOPE'}
+          </span>
+        )}
       </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-[12.5px]">
+        <Metric label="Pita pirolisis" value={p ? `${p.bawah}–${p.atas} °C` : '—'} />
+        <Metric label="Target pirolisis" value={p?.target != null ? `${Number(p.target).toFixed(1)} °C` : '—'} />
+        <Metric label="Pita tungku" value={f ? `${f.bawah}–${f.atas} °C` : '—'} />
+        <Metric label="Target tungku" value={f?.target != null ? `${Number(f.target).toFixed(1)} °C` : '—'} />
+        <Metric label="Hard cutoff pirolisis" value={`${ai?.pyro_high_cutoff_c ?? '—'} °C`} />
+        <Metric label="Threshold ONNX" value={ai?.threshold != null ? Number(ai.threshold).toFixed(2) : '—'} />
+        <Metric label="MPC horizon" value={ai?.mpc?.horizon_sec != null ? `${ai.mpc.horizon_sec} s` : '—'} />
+        <Metric label="Pulse maksimum" value={(ai?.pulse_ms_max ?? ai?.pulse_ms) != null ? `${((ai.pulse_ms_max ?? ai.pulse_ms) / 1000).toFixed(1)} s` : '—'} />
+      </div>
+      {envelope?.valid === false && (
+        <div className="mt-3 text-[12px] leading-[1.45] text-warning-teks bg-warning-bg border border-[#ECD7A6] rounded-md px-3 py-2">
+          AUTO ditahan: {envelope.issue}. OBSERVE tetap aman untuk melihat rekomendasi/guard.
+        </div>
+      )}
       <div className="border-t border-border mt-4 pt-4">
         <div className="text-[11px] uppercase tracking-[.08em] text-tinta-40">Keputusan terakhir</div>
         {d ? (
@@ -297,6 +319,12 @@ function AiDecisionPanel({ ai }) {
               <span className="tnum text-[12px] text-tinta-60">{d.probability == null ? 'score —' : `score ${Number(d.probability).toFixed(3)}`}</span>
             </div>
             <div className="text-[12.5px] leading-[1.45] text-tinta-60 mt-1">{d.reason || '—'}</div>
+            <div className="grid grid-cols-2 gap-3 mt-3 text-[12px]">
+              <Metric label="Tren pirolisis" value={d.trends?.pyro_c_per_min != null ? `${Number(d.trends.pyro_c_per_min).toFixed(2)} °C/min` : '—'} />
+              <Metric label="Tren tungku" value={d.trends?.furnace_c_per_min != null ? `${Number(d.trends.furnace_c_per_min).toFixed(2)} °C/min` : '—'} />
+              <Metric label="Pulse pilihan MPC" value={mpc?.pulse_ms != null ? `${(mpc.pulse_ms / 1000).toFixed(1)} s` : '—'} />
+              <Metric label="Prediksi horizon" value={mpc ? `${mpc.predicted_pyro_c} / ${mpc.predicted_furnace_c} °C` : '—'} />
+            </div>
           </>
         ) : (
           <div className="text-[12.5px] text-tinta-40 mt-1">Belum ada inferensi feeder pada sesi ini.</div>
@@ -337,11 +365,10 @@ function AutoModeDialog({ open, loading, ai, onCancel, onConfirm }) {
           <div>
             <h2 className="text-[19px] font-semibold mb-[7px]">Aktifkan AUTO pada feeder fisik?</h2>
             <div className="text-[13.5px] leading-[1.6] text-tinta-60">
-              AUTO mengizinkan backend menulis langsung ke <b>Firebase input/feeder</b>. Model ONNX hanya boleh membuat pulse jika seluruh interlock lolos.
-              Baseline feeder akan di-reset ke OFF saat AUTO diaktifkan.
+              AUTO mengizinkan backend menulis langsung ke <b>Firebase input/feeder</b>. ONNX membaca setpoint aktif dan tren; lightweight MPC memilih durasi pulse hanya jika guard lolos. Baseline feeder di-reset ke OFF saat AUTO diaktifkan.
             </div>
             <div className="mt-4 border border-border rounded-md px-3 py-3 text-[12.5px] leading-[1.55] bg-latar">
-              Target pirolisis <b>{ai?.pyro_target_c ?? 400} °C</b> · cutoff <b>{ai?.pyro_high_cutoff_c ?? 415} °C</b> · tungku aman <b>{ai?.min_furnace_c ?? 550}–{ai?.max_furnace_c ?? 900} °C</b>.
+              Pita pirolisis <b>{ai?.dynamic_setpoint?.pirolisis?.bawah ?? '—'}–{ai?.dynamic_setpoint?.pirolisis?.atas ?? '—'} °C</b> · pita tungku <b>{ai?.dynamic_setpoint?.tungku?.bawah ?? '—'}–{ai?.dynamic_setpoint?.tungku?.atas ?? '—'} °C</b> · hard cutoff pirolisis <b>{ai?.pyro_high_cutoff_c ?? '—'} °C</b>.
             </div>
           </div>
         </div>

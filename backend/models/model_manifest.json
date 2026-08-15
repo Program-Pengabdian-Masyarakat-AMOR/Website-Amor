@@ -1,18 +1,23 @@
 {
-  "generated_at": "2026-08-13T12:13:19.691572+00:00",
-  "provenance": "trained_on_small_synthetic_reference_informed_dataset",
+  "generated_at": "2026-08-14T13:30:30.806987+00:00",
+  "provenance": "trained_on_dynamic_setpoint_synthetic_reference_informed_dataset",
   "rows": {
-    "yield": 50,
-    "feeder": 50,
-    "monthlyHealth": 50
+    "yield": 600,
+    "feeder": 600,
+    "monthlyHealth": 600
   },
-  "target_reactor_c": 400,
+  "control_strategy": "dynamic_setpoint_onnx_plus_lightweight_mpc",
+  "setpoint_contract": "model receives the active operator band; no fixed reactor target is assumed",
   "backend_contract": {
     "yield": {
       "features": [
         "input_mass_norm",
-        "pyro_quality",
-        "furnace_quality",
+        "pyro_temp_norm",
+        "furnace_temp_norm",
+        "pyro_setpoint_quality",
+        "furnace_setpoint_quality",
+        "pyro_target_center_norm",
+        "furnace_target_center_norm",
         "progress",
         "projected_recovery",
         "running_flag"
@@ -21,9 +26,13 @@
     },
     "feeder": {
       "features": [
-        "pyro_error_norm",
-        "furnace_heat_norm",
+        "pyro_error_band_norm",
+        "pyro_headroom_low_norm",
+        "furnace_error_band_norm",
+        "furnace_headroom_low_norm",
         "waste_ratio",
+        "pyro_trend_norm",
+        "furnace_trend_norm",
         "gas_flag",
         "running_flag"
       ],
@@ -44,56 +53,56 @@
   "metrics": {
     "yield": {
       "validation": {
-        "mae": 1.842120743520142,
-        "rmse": 1.9865064762056397,
-        "r2": 0.6799676415828807
+        "mae": 1.9675289245787972,
+        "rmse": 2.4575109964077333,
+        "r2": 0.4403663171268437
       },
       "test": {
-        "mae": 1.1108710232974852,
-        "rmse": 1.2337081199281579,
-        "r2": 0.5829980200434906
+        "mae": 1.378418954156843,
+        "rmse": 1.7762452558311355,
+        "r2": 0.6272075684349869
       }
     },
     "feeder": {
       "validation": {
-        "accuracy": 0.8571428571428571,
-        "precision": 0.6666666666666666,
-        "recall": 1.0,
-        "f1": 0.8,
+        "accuracy": 0.7222222222222222,
+        "precision": 0.6444444444444445,
+        "recall": 0.7631578947368421,
+        "f1": 0.6987951807228916,
         "threshold": 0.5
       },
       "test": {
-        "accuracy": 0.875,
-        "precision": 0.75,
-        "recall": 1.0,
-        "f1": 0.8571428571428571,
+        "accuracy": 0.7888888888888889,
+        "precision": 0.7,
+        "recall": 0.8974358974358975,
+        "f1": 0.7865168539325843,
         "threshold": 0.5
       }
     },
     "monthlyHealth": {
       "validation": {
-        "accuracy": 0.8571428571428571,
-        "precision": 1.0,
-        "recall": 0.75,
-        "f1": 0.8571428571428571,
+        "accuracy": 0.9111111111111111,
+        "precision": 0.9347826086956522,
+        "recall": 0.8958333333333334,
+        "f1": 0.9148936170212766,
         "threshold": 0.5
       },
       "test": {
-        "accuracy": 0.75,
-        "precision": 0.8,
-        "recall": 0.8,
-        "f1": 0.8,
+        "accuracy": 0.9,
+        "precision": 0.9,
+        "recall": 0.9183673469387755,
+        "f1": 0.9090909090909091,
         "threshold": 0.5
       }
     }
   },
-  "warning": "Synthetic model only. Re-train and re-evaluate on real AMOR telemetry before relying on AUTO for process control.",
-  "deployed_at": "2026-08-13T12:14:16.280757+00:00",
+  "warning": "Synthetic dynamic-setpoint model only. Re-train and re-evaluate on real AMOR telemetry, then commission MPC coefficients before relying on AUTO for process control.",
+  "deployed_at": "2026-08-14T13:30:50.957205+00:00",
   "evaluation_passed": true,
   "sha256": {
-    "yield_predictor.onnx": "cf7b0e427b72e2c64633ce77077b1ce2199c01bcd7706b99ce0361b0d434f97d",
-    "feeder_policy.onnx": "3dc6e314702a3d029130bcc6cb131269d6606d15c35208a28e85ca1a819b809d",
-    "monthly_health.onnx": "576d7ea955c8d2df9294da96da83983f10c37073ee2f0e0dd9ccc8343a5380c0"
+    "yield_predictor.onnx": "d002d729f5fa4990c733ba2f294c20e44c72e6a515e845227d3294872cb3dd94",
+    "feeder_policy.onnx": "415a43bbd0db954ec570c83a2c68fbc7aeec50a6255a2b6d1dd6d61f77d6c068",
+    "monthly_health.onnx": "cdf89da03c1914b85943883421ebf868517c251b64e06bc1ff8f8ceb524b4e1d"
   },
-  "deployment_note": "Restart backend or reload AI sessions after replacing models."
+  "deployment_note": "Restart backend or reload AI sessions after replacing models. MPC coefficients still require commissioning on the real machine."
 }

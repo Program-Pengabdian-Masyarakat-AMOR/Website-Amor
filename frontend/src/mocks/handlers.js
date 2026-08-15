@@ -38,6 +38,39 @@ function healthTerkini() {
   };
 }
 
+function refreshMockAiSetpoint() {
+  const p = control.pirolisis;
+  const f = control.tungku;
+  const pTarget = (Number(p.bawah) + Number(p.atas)) / 2;
+  const fTarget = (Number(f.bawah) + Number(f.atas)) / 2;
+  const valid = pTarget >= 350 && pTarget <= 440 && pTarget < 415 && fTarget >= 700 && fTarget <= 900 && (p.atas - p.bawah) <= 160 && (f.atas - f.bawah) <= 180;
+  control.ai_feeder.dynamic_setpoint = {
+    pirolisis: { ...p, target: pTarget },
+    tungku: { ...f, target: fTarget },
+  };
+  control.ai_feeder.model_envelope.valid = valid;
+  control.ai_feeder.model_envelope.issue = valid ? null : 'setpoint mock berada di luar envelope model';
+}
+
+function monthlyHealthMock() {
+  return {
+    month: '2026-06',
+    status: 'normal',
+    risk: 0.22,
+    engine: 'mock',
+    metrics: {
+      sessions: 8,
+      weightedYield: 38.6,
+      pyroSetpointAdherence: 0.91,
+      furnaceSetpointAdherence: 0.88,
+      avgPyroC: 401.2,
+      avgFurnaceC: 803.5,
+      avgPyroTargetC: 400,
+      avgFurnaceTargetC: 800,
+    },
+  };
+}
+
 export const handlers = [
   // POST /api/auth/login → { token, role }
   http.post(`${BASE}/auth/login`, async ({ request }) => {
@@ -66,7 +99,7 @@ export const handlers = [
 
   // GET /api/health-status → status terkini (terhitung) + riwayat
   http.get(`${BASE}/health-status`, () =>
-    HttpResponse.json({ current: healthTerkini(), history: healthStatus })
+    HttpResponse.json({ current: healthTerkini(), history: healthStatus, monthly: monthlyHealthMock() })
   ),
 
   // GET /api/predictions
@@ -78,6 +111,7 @@ export const handlers = [
     const body = await request.json();
     if (body.pirolisis) control.pirolisis = { ...control.pirolisis, ...body.pirolisis };
     if (body.tungku) control.tungku = { ...control.tungku, ...body.tungku };
+    refreshMockAiSetpoint();
     return HttpResponse.json(control);
   }),
   http.put(`${BASE}/control/kontrol`, async ({ request }) => {
@@ -87,6 +121,20 @@ export const handlers = [
     if (typeof body.alarm === 'boolean') control.alarm = body.alarm;
     return HttpResponse.json(control);
   }),
+
+  http.put(`${BASE}/ai/feeder-mode`, async ({ request }) => {
+    const body = await request.json();
+    refreshMockAiSetpoint();
+    const next = String(body.mode || '').toLowerCase();
+    if (!['off', 'observe', 'auto'].includes(next)) return HttpResponse.json({ message: 'Mode tidak valid.' }, { status: 400 });
+    if (next === 'auto' && control.ai_feeder.model_envelope.valid === false) {
+      return HttpResponse.json({ message: control.ai_feeder.model_envelope.issue }, { status: 400 });
+    }
+    control.ai_feeder.mode = next;
+    return HttpResponse.json(control.ai_feeder);
+  }),
+
+  http.get(`${BASE}/ai/status`, () => HttpResponse.json({ feeder: control.ai_feeder })),
 
   // --- CRUD /api/members ---
   http.get(`${BASE}/members`, () => HttpResponse.json(members)),

@@ -30,6 +30,14 @@ export const productionDTO = (p) => ({
   waktu_proses_ms: p.waktuProsesDetik, // kolom menyimpan MILIDETIK (dari IoT)
   suhu_pirolisis_avg: p.suhuPirolisisAvg,
   suhu_tungku_avg: p.suhuTungkuAvg,
+  suhu_pirolisis_filtered: p.suhuPirolisisFiltered,
+  suhu_tungku_filtered: p.suhuTungkuFiltered,
+  pirolisis_setpoint: p.pirolisisSetpointBawah != null && p.pirolisisSetpointAtas != null
+    ? { bawah: p.pirolisisSetpointBawah, atas: p.pirolisisSetpointAtas }
+    : null,
+  tungku_setpoint: p.tungkuSetpointBawah != null && p.tungkuSetpointAtas != null
+    ? { bawah: p.tungkuSetpointBawah, atas: p.tungkuSetpointAtas }
+    : null,
   created_at: p.createdAt,
 });
 

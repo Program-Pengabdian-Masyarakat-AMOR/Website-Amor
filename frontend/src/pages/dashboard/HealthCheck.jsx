@@ -233,6 +233,35 @@ export default function HealthCheck() {
         />
       </Reveal>
 
+      {/* Health bulanan AI — mengikuti setpoint yang aktif pada tiap sesi */}
+      <Reveal delay={75} className="card mb-6">
+        <div className="card-hd flex-wrap gap-3">
+          <div>
+            <h3 className="text-[16px] font-semibold">Health AI Bulanan · Setpoint-aware</h3>
+            <div className="text-[13px] text-tinta-60">Kualitas suhu dihitung terhadap pita yang benar-benar aktif pada setiap sesi</div>
+          </div>
+          {health.data?.monthly && <HealthStatusBadge status={health.data.monthly.status} />}
+        </div>
+        <div className="p-[22px]">
+          {health.loading ? (
+            <div className="text-tinta-40">Menghitung health bulanan…</div>
+          ) : !health.data?.monthly ? (
+            <div className="text-tinta-40">Belum cukup data produksi pada bulan berjalan.</div>
+          ) : (
+            <div className="grid grid-cols-5 gap-3 max-[980px]:grid-cols-2 max-[520px]:grid-cols-1">
+              <MonthlyMetric label="AI risk" value={`${formatAngka((health.data.monthly.risk || 0) * 100)}%`} />
+              <MonthlyMetric label="Sesi" value={formatAngka(health.data.monthly.metrics?.sessions)} />
+              <MonthlyMetric label="Yield tertimbang" value={`${formatAngka(health.data.monthly.metrics?.weightedYield)}%`} />
+              <MonthlyMetric label="Kepatuhan pirolisis" value={`${formatAngka((health.data.monthly.metrics?.pyroSetpointAdherence || 0) * 100)}%`} />
+              <MonthlyMetric label="Kepatuhan tungku" value={`${formatAngka((health.data.monthly.metrics?.furnaceSetpointAdherence || 0) * 100)}%`} />
+            </div>
+          )}
+          <p className="text-[12px] text-tinta-40 mt-3 leading-[1.5]">
+            Riwayat lama yang belum menyimpan snapshot setpoint tetap dibaca memakai setpoint default lama; sesi baru menyimpan pita aktif dan suhu hasil filter mean + EWMA.
+          </p>
+        </div>
+      </Reveal>
+
       {/* Prediksi Yield */}
       <Reveal delay={90} className="card">
         <div className="card-hd flex-wrap gap-3">
@@ -256,8 +285,8 @@ export default function HealthCheck() {
             <path d="M11 12h1v4h1" />
           </svg>
           <p className="text-[13px] leading-[1.55] text-warning-teks">
-            <b>Catatan penting.</b> Hasil prediksi bersifat <b>preliminary</b> karena model dilatih dari
-            data simulasi; akurasi meningkat seiring terkumpulnya data produksi nyata.
+            <b>Catatan penting.</b> Hasil prediksi masih <b>preliminary</b> karena model dilatih dari data simulasi.
+            Model sekarang membaca suhu absolut, pita setpoint aktif, progress, dan recovery; suhu sesi difilter dengan kombinasi mean + EWMA agar spike singkat tidak terlalu mendominasi.
           </p>
         </div>
 
@@ -304,6 +333,15 @@ export default function HealthCheck() {
         </div>
       </Reveal>
     </>
+  );
+}
+
+function MonthlyMetric({ label, value }) {
+  return (
+    <div className="rounded-md border border-border bg-latar px-4 py-[13px]">
+      <div className="text-[11.5px] text-tinta-40">{label}</div>
+      <div className="font-body font-bold text-[20px] tnum mt-1">{value}</div>
+    </div>
   );
 }
 

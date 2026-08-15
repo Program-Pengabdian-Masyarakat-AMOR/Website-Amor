@@ -8,10 +8,12 @@ import {
   getFeederAutomationStatus,
   initFeederAutomation,
   registerManualFeederOverride,
+  reevaluateFeederTelemetry,
 } from './feederAutomation.js';
 
 const MAX_LOG = 30; // 30 titik rata-rata menit terakhir untuk grafik
 const LIVE_PREDICTION_INTERVAL_MS = 5000;
+const TEMP_EWMA_ALPHA = Math.min(0.5, Math.max(0.03, Number(process.env.AI_TEMP_EWMA_ALPHA) || 0.18));
 
 let latest = null;
 let minuteSeries = [];
@@ -30,6 +32,14 @@ let monitoring = {};
 let activeSession = null;
 
 const num = (v) => (v == null || Number.isNaN(Number(v)) ? 0 : Number(v));
+const firstFinite = (...values) => {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+};
 
 function normalizeStatus(raw) {
   const s = String(raw || '').toUpperCase();
@@ -86,6 +96,12 @@ function startSession(t) {
     startedAt: Date.now(),
     sumPir: 0,
     sumTun: 0,
+    sumPyroLow: 0,
+    sumPyroHigh: 0,
+    sumFurnaceLow: 0,
+    sumFurnaceHigh: 0,
+    ewmaPir: null,
+    ewmaTun: null,
     n: 0,
     gasSeen: false,
     livePrediction: null,
@@ -95,10 +111,47 @@ function startSession(t) {
   updateSessionStats(t);
 }
 
+function sessionBands(session = activeSession) {
+  const n = Math.max(1, Number(session?.n) || 0);
+  return {
+    pirolisis: {
+      bawah: session?.n ? session.sumPyroLow / n : control.pirolisis.bawah,
+      atas: session?.n ? session.sumPyroHigh / n : control.pirolisis.atas,
+    },
+    tungku: {
+      bawah: session?.n ? session.sumFurnaceLow / n : control.tungku.bawah,
+      atas: session?.n ? session.sumFurnaceHigh / n : control.tungku.atas,
+    },
+  };
+}
+
+function filteredSessionTemperatures(session = activeSession, fallbackTelemetry = null) {
+  const n = Math.max(1, Number(session?.n) || 0);
+  const meanPir = session?.n ? session.sumPir / n : num(fallbackTelemetry?.suhu_pirolisis);
+  const meanTun = session?.n ? session.sumTun / n : num(fallbackTelemetry?.suhu_tungku);
+  const ewmaPir = Number.isFinite(Number(session?.ewmaPir)) ? Number(session.ewmaPir) : meanPir;
+  const ewmaTun = Number.isFinite(Number(session?.ewmaTun)) ? Number(session.ewmaTun) : meanTun;
+  // Blend mean (whole-session context) + EWMA (reject stale/transient spikes better for live prediction).
+  return {
+    meanPir,
+    meanTun,
+    filteredPir: 0.35 * meanPir + 0.65 * ewmaPir,
+    filteredTun: 0.35 * meanTun + 0.65 * ewmaTun,
+  };
+}
+
 function updateSessionStats(t) {
   if (!activeSession || t.status_sistem !== 'running') return;
-  activeSession.sumPir += num(t.suhu_pirolisis);
-  activeSession.sumTun += num(t.suhu_tungku);
+  const pir = num(t.suhu_pirolisis);
+  const tun = num(t.suhu_tungku);
+  activeSession.sumPir += pir;
+  activeSession.sumTun += tun;
+  activeSession.sumPyroLow += num(control.pirolisis.bawah);
+  activeSession.sumPyroHigh += num(control.pirolisis.atas);
+  activeSession.sumFurnaceLow += num(control.tungku.bawah);
+  activeSession.sumFurnaceHigh += num(control.tungku.atas);
+  activeSession.ewmaPir = activeSession.ewmaPir == null ? pir : TEMP_EWMA_ALPHA * pir + (1 - TEMP_EWMA_ALPHA) * activeSession.ewmaPir;
+  activeSession.ewmaTun = activeSession.ewmaTun == null ? tun : TEMP_EWMA_ALPHA * tun + (1 - TEMP_EWMA_ALPHA) * activeSession.ewmaTun;
   activeSession.n += 1;
   activeSession.gasSeen ||= t.status_gas === true;
 
@@ -106,14 +159,16 @@ function updateSessionStats(t) {
   if (now - activeSession.lastPredictionAt < LIVE_PREDICTION_INTERVAL_MS) return;
   activeSession.lastPredictionAt = now;
   const elapsedMs = now - activeSession.startedAt;
-  const avgPir = activeSession.sumPir / Math.max(1, activeSession.n);
-  const avgTun = activeSession.sumTun / Math.max(1, activeSession.n);
+  const temps = filteredSessionTemperatures(activeSession, t);
+  const bands = sessionBands(activeSession);
   const predictionSessionId = activeSession.sessionId;
   predictYield({
     inputKg: t.berat_sampah_total,
     oilKg: t.berat_minyak,
-    pyroC: avgPir,
-    furnaceC: avgTun,
+    pyroC: temps.filteredPir,
+    furnaceC: temps.filteredTun,
+    pyroBand: bands.pirolisis,
+    furnaceBand: bands.tungku,
     elapsedMs,
     running: true,
   })
@@ -125,6 +180,8 @@ function updateSessionStats(t) {
         session_id: activeSession.sessionId,
         predicted_yield: prediction.predictedYield,
         engine: prediction.engine,
+        setpoint: prediction.context,
+        filter: 'mean+ewma',
         timestamp: new Date().toISOString(),
       });
     })
@@ -137,6 +194,12 @@ async function finalizeSession(t) {
     startedAt: Date.now(),
     sumPir: num(t.suhu_pirolisis),
     sumTun: num(t.suhu_tungku),
+    sumPyroLow: num(control.pirolisis.bawah),
+    sumPyroHigh: num(control.pirolisis.atas),
+    sumFurnaceLow: num(control.tungku.bawah),
+    sumFurnaceHigh: num(control.tungku.atas),
+    ewmaPir: num(t.suhu_pirolisis),
+    ewmaTun: num(t.suhu_tungku),
     n: 1,
     gasSeen: t.status_gas === true,
     livePrediction: null,
@@ -150,14 +213,26 @@ async function finalizeSession(t) {
   const minyak = num(monitoring.berat_minyak_total_akhir) || num(monitoring.berat_minyak);
   const waktuMs = Math.round(num(monitoring.waktu_proses)) || Math.max(0, Date.now() - session.startedAt);
   const yieldPct = sampah > 0 ? Number(((minyak / sampah) * 100).toFixed(1)) : 0;
-  const avgPir = session.n ? session.sumPir / session.n : num(t.suhu_pirolisis);
-  const avgTun = session.n ? session.sumTun / session.n : num(t.suhu_tungku);
+  const temps = filteredSessionTemperatures(session, t);
+  const avgPir = temps.meanPir;
+  const avgTun = temps.meanTun;
+  const filteredPir = temps.filteredPir;
+  const filteredTun = temps.filteredTun;
+  const bands = sessionBands(session);
 
-  let predictedYield = session.livePrediction?.predictedYield;
-  if (!Number.isFinite(Number(predictedYield))) {
-    const pred = await predictYield({ inputKg: sampah, oilKg: minyak, pyroC: avgPir, furnaceC: avgTun, elapsedMs: waktuMs, running: false });
-    predictedYield = pred.predictedYield;
-  }
+  // Selalu hitung final prediction dengan output akhir + filtered temperature + rata-rata
+  // setpoint sesi. Jangan memakai snapshot live lama sebagai prediksi final.
+  const finalPred = await predictYield({
+    inputKg: sampah,
+    oilKg: minyak,
+    pyroC: filteredPir,
+    furnaceC: filteredTun,
+    pyroBand: bands.pirolisis,
+    furnaceBand: bands.tungku,
+    elapsedMs: waktuMs,
+    running: false,
+  });
+  const predictedYield = finalPred.predictedYield;
 
   const log = await prisma.productionLog.create({
     data: {
@@ -168,6 +243,12 @@ async function finalizeSession(t) {
       waktuProsesDetik: waktuMs, // legacy column name; value is milliseconds
       suhuPirolisisAvg: Number(avgPir.toFixed(2)),
       suhuTungkuAvg: Number(avgTun.toFixed(2)),
+      suhuPirolisisFiltered: Number(filteredPir.toFixed(2)),
+      suhuTungkuFiltered: Number(filteredTun.toFixed(2)),
+      pirolisisSetpointBawah: Number(bands.pirolisis.bawah.toFixed(2)),
+      pirolisisSetpointAtas: Number(bands.pirolisis.atas.toFixed(2)),
+      tungkuSetpointBawah: Number(bands.tungku.bawah.toFixed(2)),
+      tungkuSetpointAtas: Number(bands.tungku.atas.toFixed(2)),
     },
   });
 
@@ -178,11 +259,20 @@ async function finalizeSession(t) {
       inputKg: sampah,
       outputKg: minyak,
       elapsedMs: waktuMs,
-      pyroAvg: avgPir,
-      furnaceAvg: avgTun,
+      pyroAvg: filteredPir,
+      furnaceAvg: filteredTun,
+      pyroBand: bands.pirolisis,
+      furnaceBand: bands.tungku,
       predictedYield,
     }),
-    upsertSessionHealth({ sessionId: session.sessionId, pyroAvg: avgPir, furnaceAvg: avgTun, gasDetected: session.gasSeen }),
+    upsertSessionHealth({
+      sessionId: session.sessionId,
+      pyroAvg: filteredPir,
+      furnaceAvg: filteredTun,
+      pyroBand: bands.pirolisis,
+      furnaceBand: bands.tungku,
+      gasDetected: session.gasSeen,
+    }),
   ]);
   await refreshMonthlyHealth(log.createdAt);
 
@@ -246,12 +336,12 @@ function inputToControl(input) {
   const d = DEFAULT_SETPOINTS;
   return {
     pirolisis: {
-      bawah: num(input?.pirolisis_bawah) || num(input?.pirolisis?.suhu_bawah) || d.pirolisis.bawah,
-      atas: num(input?.pirolisis_atas) || num(input?.pirolisis?.suhu_atas) || d.pirolisis.atas,
+      bawah: firstFinite(input?.pirolisis_bawah, input?.pirolisis?.suhu_bawah, d.pirolisis.bawah),
+      atas: firstFinite(input?.pirolisis_atas, input?.pirolisis?.suhu_atas, d.pirolisis.atas),
     },
     tungku: {
-      bawah: num(input?.tungku_bawah) || num(input?.tungku?.suhu_bawah) || d.tungku.bawah,
-      atas: num(input?.tungku_atas) || num(input?.tungku?.suhu_atas) || d.tungku.atas,
+      bawah: firstFinite(input?.tungku_bawah, input?.tungku?.suhu_bawah, d.tungku.bawah),
+      atas: firstFinite(input?.tungku_atas, input?.tungku?.suhu_atas, d.tungku.atas),
     },
     blower: Boolean(input?.blower ?? input?.kontrol?.blower),
     feeder: Boolean(input?.feeder ?? input?.kontrol?.feeder),
@@ -282,6 +372,11 @@ export async function setSetpoint({ pirolisis, tungku }) {
       tungku_bawah: control.tungku.bawah,
       tungku_atas: control.tungku.atas,
     });
+  }
+  // Setpoint baru langsung memengaruhi guard + MPC. Jika pulse AUTO sedang aktif dan
+  // band baru membuat kondisi tidak aman, reevaluation akan mematikannya segera.
+  if (latest) {
+    await reevaluateFeederTelemetry(latest).catch((e) => console.error('[ai-feeder] reevaluasi setpoint gagal:', e.message));
   }
   return getControl();
 }

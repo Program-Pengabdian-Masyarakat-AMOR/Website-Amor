@@ -28,8 +28,14 @@ router.get(
           const ai = await predictYield({
             inputKg: log.beratSampahTotal,
             oilKg: log.beratMinyakTotal,
-            pyroC: log.suhuPirolisisAvg,
-            furnaceC: log.suhuTungkuAvg,
+            pyroC: log.suhuPirolisisFiltered ?? log.suhuPirolisisAvg,
+            furnaceC: log.suhuTungkuFiltered ?? log.suhuTungkuAvg,
+            pyroBand: log.pirolisisSetpointBawah != null && log.pirolisisSetpointAtas != null
+              ? { bawah: log.pirolisisSetpointBawah, atas: log.pirolisisSetpointAtas }
+              : undefined,
+            furnaceBand: log.tungkuSetpointBawah != null && log.tungkuSetpointAtas != null
+              ? { bawah: log.tungkuSetpointBawah, atas: log.tungkuSetpointAtas }
+              : undefined,
             elapsedMs: log.waktuProsesDetik,
             running: false,
           });
