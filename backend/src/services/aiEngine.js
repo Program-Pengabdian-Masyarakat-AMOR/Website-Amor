@@ -38,6 +38,8 @@ export const DEFAULT_AI_BANDS = {
 
 let ort = null;
 let ortLoadAttempted = false;
+let ortLoadPromise = null;
+
 const sessions = new Map();
 const failures = new Map();
 
@@ -51,17 +53,50 @@ function fallbackRun(kind, x) {
 }
 
 async function loadOrt() {
-  if (ortLoadAttempted) return ort;
-  ortLoadAttempted = true;
-  try {
-    const mod = await import('onnxruntime-node');
-    ort = mod.default || mod;
-    console.log('[ai] ONNX Runtime Node aktif.');
-  } catch (e) {
-    failures.set('runtime', e.message);
-    console.warn('[ai] onnxruntime-node belum tersedia — memakai fallback numerik identik dengan model staging.');
+  // Runtime sudah berhasil dimuat.
+  if (ort) return ort;
+
+  // Ada proses load yang sedang berlangsung.
+  // Semua pemanggil harus menunggu Promise yang sama,
+  // bukan mengembalikan `ort` yang masih null.
+  if (ortLoadPromise) {
+    return ortLoadPromise;
   }
-  return ort;
+
+  // Jika sebelumnya sudah benar-benar gagal dimuat,
+  // pertahankan fallback untuk proses ini.
+  if (ortLoadAttempted && failures.has('runtime')) {
+    return null;
+  }
+
+  ortLoadAttempted = true;
+
+  ortLoadPromise = (async () => {
+    try {
+      const mod = await import('onnxruntime-node');
+
+      ort = mod.default || mod;
+      failures.delete('runtime');
+
+      console.log('[ai] ONNX Runtime Node aktif.');
+
+      return ort;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+
+      failures.set('runtime', message);
+
+      console.warn(
+        '[ai] onnxruntime-node belum tersedia — memakai fallback numerik identik dengan model staging.'
+      );
+
+      return null;
+    } finally {
+      ortLoadPromise = null;
+    }
+  })();
+
+  return ortLoadPromise;
 }
 
 function modelDir() {
