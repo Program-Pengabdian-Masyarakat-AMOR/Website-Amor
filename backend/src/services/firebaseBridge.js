@@ -443,11 +443,21 @@ export function initBridge(io) {
   setInterval(flushMinuteLog, 60000);
 
   if (!db) {
-    console.warn('[bridge] Firebase off — menjalankan simulator telemetri untuk dev.');
+    if (process.env.NODE_ENV === 'production') {
+      const message =
+        'Firebase tidak tersedia pada mode production. Simulator telemetri dinonaktifkan.';
+
+      console.error(`[bridge] ${message}`);
+      throw new Error(message);
+    }
+
+    console.warn(
+      '[bridge] Firebase off — menjalankan simulator telemetri khusus development.'
+    );
     startSimulator();
     return;
   }
-
+  
   db.ref('input').get().then(async (snap) => {
     const raw = snap.val() || {};
     control = inputToControl(raw);
