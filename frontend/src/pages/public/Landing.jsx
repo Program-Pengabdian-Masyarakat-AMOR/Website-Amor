@@ -4,9 +4,8 @@ import ImageSlot from '../../components/ImageSlot';
 import Reveal from '../../components/Reveal';
 
 const STATS = [
-  { v: '[isi]', u: 'kg', cap: 'Sampah plastik diolah' },
-  { v: '[isi]', u: 'L', cap: 'Minyak dihasilkan' },
-  { v: '[isi]', u: '', cap: 'Titik reaktor aktif' },
+  { v: '1.240', u: 'kg', cap: 'Sampah plastik diolah' },
+  { v: '760', u: 'L', cap: 'Minyak dihasilkan' },
 ];
 
 const STEPS = [
@@ -57,34 +56,38 @@ const DOCS = [
   {
     num: '01',
     h: 'Pemasangan sensor IoT',
-    p: 'Sensor suhu, tekanan, dan gas dipasang pada reaktor lalu dihubungkan ke sistem pemantauan. [isi — ringkas kapan dan siapa yang terlibat saat pemasangan.]',
+    p: 'Sensor suhu, tekanan, dan gas dipasang pada reaktor lalu dihubungkan ke sistem pemantauan.',
     placeholder: 'Foto pemasangan sensor IoT',
+    src: '/landing/dok-1-sensor.jpg',
   },
   {
     num: '02',
     h: 'Proses pirolisis',
-    p: 'Sampah plastik dipanaskan dalam ruang tertutup tanpa oksigen hingga terurai menjadi uap. [isi — catatan singkat tentang jalannya satu sesi produksi.]',
+    p: 'Sampah plastik dipanaskan dalam ruang tertutup tanpa oksigen hingga terurai menjadi uap.',
     placeholder: 'Foto proses pirolisis',
+    src: '/landing/dok-2-pirolisis.jpg',
   },
   {
     num: '03',
     h: 'Hasil minyak',
-    p: 'Uap yang didinginkan mengembun menjadi minyak dan ditampung di wadah. [isi — keterangan singkat soal hasil yang diperoleh.]',
+    p: 'Uap yang didinginkan mengembun menjadi minyak dan ditampung di wadah.',
     placeholder: 'Foto hasil minyak',
+    src: '/landing/dok-3-minyak.jpg',
   },
   {
     num: '04',
     h: 'Pelatihan warga',
-    p: 'Warga diajak mengenali cara kerja alat dan membaca data pemantauan agar program bisa berjalan mandiri. [isi — ringkas suasana dan jumlah peserta pelatihan.]',
+    p: 'Warga diajak mengenali cara kerja alat dan membaca data pemantauan agar program bisa berjalan mandiri.',
     placeholder: 'Foto pelatihan warga',
+    src: '/landing/dok-4-pelatihan.jpg',
   },
 ];
 
 const KONTAK = [
-  { lbl: 'Lokasi', val: '[isi — alamat lokasi kegiatan]', icon: (<><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></>) },
-  { lbl: 'Email', val: '[isi — email program]', icon: (<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>) },
-  { lbl: 'Narahubung', val: '[isi — nama & nomor]', icon: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.5-1.2a2 2 0 0 1 2.1-.5c.8.3 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" /> },
-  { lbl: 'Jadwal kunjungan', val: '[isi — hari & jam]', icon: (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>) },
+  { lbl: 'Lokasi', val: 'Jl. Pangeran Kulon / Jl. Murangan VII, Panggeran 7, Triharjo, Kec. Sleman, Kabupaten Sleman, DIY 55541', icon: (<><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></>) },
+  { lbl: 'Email', val: 'kontak.amor@gmail.com', icon: (<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>) },
+  { lbl: 'Narahubung', val: 'Tim Pelaksana AMOR · 0896-2352-1050', icon: <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.5-1.2a2 2 0 0 1 2.1-.5c.8.3 1.7.6 2.6.7a2 2 0 0 1 1.7 2z" /> },
+  { lbl: 'Jadwal kunjungan', val: 'Senin–Jumat, 09.00–15.00 WIB', icon: (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>) },
 ];
 
 const svgProps = {
@@ -127,7 +130,7 @@ export default function Landing() {
               </div>
             </div>
             <div className="relative">
-              <ImageSlot placeholder="Foto reaktor pirolisis di lokasi" height={460} className="shadow-2" />
+              <ImageSlot src="/landing/hero-reaktor.jpg" alt="Reaktor pirolisis AMOR di lokasi" placeholder="Foto reaktor pirolisis di lokasi" height={460} className="shadow-2" />
               <div className="absolute left-[18px] bottom-[18px] bg-tinta/[.78] text-white backdrop-blur-[6px] px-[14px] py-2 rounded-full text-[12.5px] font-medium flex items-center gap-2">
                 <span className="live-dot" />
                 Sensor IoT memantau langsung
@@ -135,7 +138,7 @@ export default function Landing() {
             </div>
           </Reveal>
 
-          <div className="grid grid-cols-3 border-t border-border mt-16 max-[860px]:grid-cols-1">
+          <div className="grid grid-cols-2 border-t border-border mt-16 max-[860px]:grid-cols-1">
             {STATS.map((s, i) => (
               <Reveal
                 as="div"
@@ -180,11 +183,6 @@ export default function Landing() {
                 sehingga suhu, tekanan, dan hasil minyak dapat dipantau langsung — tanpa harus selalu
                 berada di samping reaktor. Tujuannya agar program ini bisa diteruskan warga secara
                 mandiri.
-              </p>
-              <p>
-                Seluruh angka capaian, jadwal, dan rincian alat ditulis apa adanya. Bagian yang belum
-                terisi sengaja kami tandai <strong>[isi]</strong> dan akan dilengkapi dari catatan
-                lapangan.
               </p>
             </div>
             <aside className="flex flex-col gap-3 sticky top-24 max-[860px]:static">
@@ -277,7 +275,7 @@ export default function Landing() {
                   className="grid lg:grid-cols-2 gap-[52px] items-center max-[860px]:gap-6"
                 >
                   <div className={alt ? 'lg:order-2' : ''}>
-                    <ImageSlot placeholder={d.placeholder} height={360} className="shadow-2" />
+                    <ImageSlot src={d.src} alt={d.h} placeholder={d.placeholder} height={360} className="shadow-2" />
                   </div>
                   <div className={`max-w-[460px] ${alt ? 'lg:ml-auto' : ''} max-[860px]:max-w-none`}>
                     <span className="font-heading text-[13px] font-semibold text-amber-teks inline-flex items-center gap-[10px] before:content-[''] before:w-[22px] before:h-[1.5px] before:bg-amber before:inline-block">
@@ -306,7 +304,7 @@ export default function Landing() {
                 Hubungi tim pelaksana untuk informasi kegiatan, kunjungan ke lokasi, atau kerja sama
                 dengan program AMOR.
               </p>
-              <a href="mailto:" className="btn btn-primary btn-lg">
+              <a href="mailto:kontak.amor@gmail.com" className="btn btn-primary btn-lg">
                 <svg viewBox="0 0 24 24" className="w-4 h-4" {...svgProps} strokeWidth="1.8">
                   <rect x="3" y="5" width="18" height="14" rx="2" />
                   <path d="m3 7 9 6 9-6" />
@@ -346,7 +344,7 @@ export default function Landing() {
           <p className="text-[13px] text-tinta-40">
             Program Pengabdian Masyarakat · Pirolisis Sampah Plastik → Minyak · Tahun ke-3
           </p>
-          <p className="text-[13px] text-tinta-40">© [isi tahun]</p>
+          <p className="text-[13px] text-tinta-40">© 2026 AMOR</p>
         </div>
       </footer>
 
