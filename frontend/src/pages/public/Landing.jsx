@@ -6,6 +6,7 @@ import Reveal from '../../components/Reveal';
 const STATS = [
   { v: '1.240', u: 'kg', cap: 'Sampah plastik diolah' },
   { v: '760', u: 'L', cap: 'Minyak dihasilkan' },
+  { v: '2', u: 'titik', cap: 'Reaktor pirolisis' },
 ];
 
 const STEPS = [
@@ -58,28 +59,28 @@ const DOCS = [
     h: 'Pemasangan sensor IoT',
     p: 'Sensor suhu, tekanan, dan gas dipasang pada reaktor lalu dihubungkan ke sistem pemantauan.',
     placeholder: 'Foto pemasangan sensor IoT',
-    src: '/landing/dok-1-sensor.jpg',
+    src: '/landing/dok-1-sensor.webp',
   },
   {
     num: '02',
     h: 'Proses pirolisis',
     p: 'Sampah plastik dipanaskan dalam ruang tertutup tanpa oksigen hingga terurai menjadi uap.',
     placeholder: 'Foto proses pirolisis',
-    src: '/landing/dok-2-pirolisis.jpg',
+    src: '/landing/dok-2-pirolisis.webp',
   },
   {
     num: '03',
     h: 'Hasil minyak',
     p: 'Uap yang didinginkan mengembun menjadi minyak dan ditampung di wadah.',
     placeholder: 'Foto hasil minyak',
-    src: '/landing/dok-3-minyak.jpg',
+    src: '/landing/dok-3-minyak.webp',
   },
   {
     num: '04',
     h: 'Pelatihan warga',
     p: 'Warga diajak mengenali cara kerja alat dan membaca data pemantauan agar program bisa berjalan mandiri.',
     placeholder: 'Foto pelatihan warga',
-    src: '/landing/dok-4-pelatihan.jpg',
+    src: '/landing/dok-4-pelatihan.webp',
   },
 ];
 
@@ -130,7 +131,7 @@ export default function Landing() {
               </div>
             </div>
             <div className="relative">
-              <ImageSlot src="/landing/hero-reaktor.jpg" alt="Reaktor pirolisis AMOR di lokasi" placeholder="Foto reaktor pirolisis di lokasi" height={460} className="shadow-2" />
+              <ImageSlot src="/landing/hero-reaktor.webp" alt="Reaktor pirolisis AMOR di lokasi" placeholder="Foto reaktor pirolisis di lokasi" height={460} className="shadow-2" loading="eager" fetchPriority="high" />
               <div className="absolute left-[18px] bottom-[18px] bg-tinta/[.78] text-white backdrop-blur-[6px] px-[14px] py-2 rounded-full text-[12.5px] font-medium flex items-center gap-2">
                 <span className="live-dot" />
                 Sensor IoT memantau langsung
@@ -138,13 +139,13 @@ export default function Landing() {
             </div>
           </Reveal>
 
-          <div className="grid grid-cols-2 border-t border-border mt-16 max-[860px]:grid-cols-1">
+          <div className="grid grid-cols-3 border-t border-border mt-16 max-[860px]:grid-cols-1">
             {STATS.map((s, i) => (
               <Reveal
                 as="div"
                 key={s.cap}
                 delay={i * 90}
-                className={`pr-7 py-[26px] ${i < STATS.length - 1 ? 'border-r border-border max-[860px]:border-r-0' : ''} max-[860px]:border-b max-[860px]:border-border max-[860px]:py-[22px] max-[860px]:pr-0`}
+                className={`py-[26px] px-7 ${i === 0 ? 'pl-0' : ''} ${i === STATS.length - 1 ? 'pr-0' : 'border-r border-border'} max-[860px]:px-0 max-[860px]:py-[22px] max-[860px]:border-r-0 ${i < STATS.length - 1 ? 'max-[860px]:border-b max-[860px]:border-border' : ''}`}
               >
                 <div className="font-heading font-semibold text-[34px] leading-none tnum">
                   <span className="text-amber-teks">{s.v}</span>

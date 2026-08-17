@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function ImageSlot({ src, alt, placeholder = 'Foto', className = '', height = 360 }) {
+export default function ImageSlot({ src, alt, placeholder = 'Foto', className = '', height = 360, loading = 'lazy', fetchPriority = 'auto' }) {
   const [failed, setFailed] = useState(false);
   const tampilFoto = src && !failed;
 
@@ -13,7 +13,9 @@ export default function ImageSlot({ src, alt, placeholder = 'Foto', className = 
         <img
           src={src}
           alt={alt || placeholder}
-          loading="lazy"
+          loading={loading}
+          fetchPriority={fetchPriority}
+          decoding="async"
           className="w-full h-full object-cover"
           onError={() => setFailed(true)}
         />
