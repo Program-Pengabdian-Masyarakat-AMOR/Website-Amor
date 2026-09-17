@@ -2,6 +2,31 @@
 
 Backend AMOR menjadi jembatan Firebase ↔ web, API aplikasi, penyimpanan Prisma, inference ONNX, dan kontrol AI feeder.
 
+## Role & akses
+
+Ada tiga role; login wajib memilih role dan role harus sama dengan role akun (`POST /api/auth/login { username, password, role }`).
+Halaman login web ada di alamat tersamar **`/administrator/login`** (tidak ditautkan dari landing page).
+
+| Role | Section | Endpoint yang boleh |
+|---|---|---|
+| `admin` | Status Sistem, Health Check, Data & Rekap, Anggota | baca telemetri/produksi/health/feeder/AI, `GET /system/status`, `GET /recap/:jenis`, CRUD `/members` |
+| `operator` | Dashboard, Monitoring & Log, Kontrol | baca telemetri/produksi/health/feeder/AI, `PUT /control/*`, `PUT /ai/feeder-mode` |
+| `management` | Dashboard Penjualan, Penjualan, Data Publik | CRUD `/sales`, `PUT /site-content/:key` |
+
+Diagram lengkap ada di `docs/diagrams/`.
+
+### Deploy pembaruan role (server produksi)
+
+```bash
+npm install
+npm run prisma:generate
+npm run prisma:deploy          # menambah tabel SiteContent
+# buat akun management (AMAN: tidak menghapus data lain)
+npm run user:create -- --username <nama> --password "<sandi min 8 karakter>" --role management
+```
+
+> **Jangan jalankan `npm run seed` di produksi** — seed menghapus data penjualan, produksi, dan anggota.
+
 ## Dynamic-setpoint AI
 
 Setpoint suhu yang disimpan operator sekarang menjadi konteks dinamis untuk tiga subsistem AI:
@@ -70,6 +95,9 @@ Koefisien `AI_MPC_PYRO_DROP_C` dan `AI_MPC_FURNACE_DROP_C` **harus dikalibrasi d
 - `GET /api/control`
 - `PUT /api/control/setpoint`
 - `PUT /api/control/kontrol`
+- `GET /api/system/status` — health check koneksi Firebase, database, AI, server (admin)
+- `GET /api/recap/production|health|feeder?dari=YYYY-MM-DD&sampai=YYYY-MM-DD` — data lampau untuk rekap (admin)
+- `GET /api/site-content/landing-stats` (publik) · `PUT` (management) — statistik landing page
 - endpoint AI/status/feeder-mode yang didaftarkan di routes AI
 
 Socket utama mencakup `sensor-update`, `health-update`, `yield-prediction`, `ai-feeder-mode`, dan `ai-feeder-decision`.
