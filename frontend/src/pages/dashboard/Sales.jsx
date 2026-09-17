@@ -10,39 +10,26 @@ import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import { formatAngka, formatRupiah } from '../../lib/format';
+import { MONTHS, MONTHS_FULL, rentangPeriode, labelPeriode, tanggalHariIni } from '../../lib/periode';
 
 const SalesBarChart = lazy(() => import('../../components/SalesBarChart'));
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-const MONTHS_FULL = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-const PERIODS = [
-  { key: '2026-06', label: 'Juni', dari: '2026-06-01', sampai: '2026-06-30' },
-  { key: '2026-05', label: 'Mei', dari: '2026-05-01', sampai: '2026-05-31' },
-  { key: '2026-04', label: 'April', dari: '2026-04-01', sampai: '2026-04-30' },
-  { key: 'all', label: 'Apr–Jun', dari: '2026-04-01', sampai: '2026-06-30' },
-];
-
-function periodLabel(key) {
-  if (key === 'all') return 'April–Juni 2026';
-  const [y, m] = key.split('-');
-  return `${MONTHS_FULL[parseInt(m, 10) - 1]} ${y}`;
-}
-function monthLabel(key) {
-  const [, m] = key.split('-');
-  return MONTHS[parseInt(m, 10) - 1];
-}
 const KOSONG = { id: null, tanggal: '', jumlah_liter: '', harga_per_liter: '', pembeli: '' };
 const parseNum = (v) => Number(String(v).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
 
 export default function Sales() {
   const { toast, toastProps } = useToast();
-  const [period, setPeriod] = useState('2026-06');
-  const cur = PERIODS.find((p) => p.key === period);
+  // Periode dinamis: tahun + bulan (1–12) atau 'all' untuk setahun penuh.
+  // Default = bulan berjalan, jadi data bulan baru langsung terlihat tanpa ubah kode.
+  const sekarang = new Date();
+  const [tahun, setTahun] = useState(sekarang.getFullYear());
+  const [bulan, setBulan] = useState(sekarang.getMonth() + 1);
+  const { dari, sampai, prefix } = rentangPeriode(tahun, bulan);
+  const periodeLabel = labelPeriode(tahun, bulan);
 
   const allSales = useApi(() => api.get('/sales'), []);
-  const ringkasan = useApi(() => api.get(`/sales/summary?dari=${cur.dari}&sampai=${cur.sampai}`), [period]);
+  const ringkasan = useApi(() => api.get(`/sales/summary?dari=${dari}&sampai=${sampai}`), [dari, sampai]);
   const total = useApi(() => api.get('/sales/summary'), []);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -54,35 +41,38 @@ export default function Sales() {
 
   const sales = useMemo(() => allSales.data || [], [allSales.data]);
 
+  // Pilihan tahun = tahun yang punya transaksi + tahun berjalan.
+  const daftarTahun = useMemo(() => {
+    const set = new Set([sekarang.getFullYear(), tahun]);
+    sales.forEach((s) => set.add(Number(s.tanggal.slice(0, 4))));
+    return [...set].filter(Number.isFinite).sort((a, b) => b - a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, tahun]);
+
   // Baris untuk periode terpilih (urut tanggal terbaru dulu).
-  const rows = useMemo(() => {
-    const inRange =
-      period === 'all'
-        ? sales.filter((s) => s.tanggal >= '2026-04-01' && s.tanggal <= '2026-06-30')
-        : sales.filter((s) => s.tanggal.slice(0, 7) === period);
-    return inRange.slice().sort((a, b) => (a.tanggal < b.tanggal ? 1 : -1));
-  }, [sales, period]);
+  const rows = useMemo(
+    () => sales.filter((s) => s.tanggal.startsWith(prefix)).sort((a, b) => (a.tanggal < b.tanggal ? 1 : -1)),
+    [sales, prefix]
+  );
 
-  // Agregasi liter per bulan untuk grafik.
+  // Liter per bulan (Jan–Des) untuk tahun terpilih; bulan tanpa transaksi = 0.
   const monthly = useMemo(() => {
-    const map = {};
+    const liter = Array(12).fill(0);
     sales.forEach((s) => {
-      const k = s.tanggal.slice(0, 7);
-      map[k] = (map[k] || 0) + Number(s.jumlah_liter);
+      if (!s.tanggal.startsWith(`${tahun}-`)) return;
+      liter[Number(s.tanggal.slice(5, 7)) - 1] += Number(s.jumlah_liter);
     });
-    return Object.keys(map)
-      .sort()
-      .map((k) => ({ key: k, label: monthLabel(k), liter: Number(map[k].toFixed(1)) }));
-  }, [sales]);
+    return liter.map((v, i) => ({ key: i + 1, label: MONTHS[i], liter: Number(v.toFixed(1)) }));
+  }, [sales, tahun]);
 
-  const isDipilih = (k) => (period === 'all' ? k >= '2026-04' && k <= '2026-06' : k === period);
+  const isDipilih = (k) => bulan === 'all' || k === bulan;
 
   async function reloadAll() {
     await Promise.all([allSales.reload(), ringkasan.reload(), total.reload()]);
   }
 
   function openTambah() {
-    setForm({ ...KOSONG, tanggal: '2026-06-13' });
+    setForm({ ...KOSONG, tanggal: tanggalHariIni() });
     setInvalid({});
     setFormOpen(true);
   }
@@ -184,7 +174,7 @@ export default function Sales() {
 
   const footer = rows.length
     ? [
-        { content: <b>Total {periodLabel(period)}</b> },
+        { content: <b>Total {periodeLabel}</b> },
         { content: <b>{formatAngka(rows.reduce((a, r) => a + Number(r.jumlah_liter), 0))} L</b>, align: 'right', className: 'tnum' },
         { content: '' },
         { content: <b>{formatRupiah(rows.reduce((a, r) => a + Number(r.total_harga), 0))}</b>, align: 'right', className: 'tnum' },
@@ -216,7 +206,7 @@ export default function Sales() {
       <Reveal className="grid grid-cols-3 gap-5 mb-6 max-[1080px]:grid-cols-1">
         <SalesSummaryCard
           label="Liter terjual"
-          period={periodLabel(period)}
+          period={periodeLabel}
           value={formatAngka(ringkas?.total_liter)}
           unit="liter"
           sub={ringkas ? `${ringkas.jumlah_transaksi} transaksi pada periode ini` : '—'}
@@ -224,7 +214,7 @@ export default function Sales() {
         />
         <SalesSummaryCard
           label="Pendapatan"
-          period={periodLabel(period)}
+          period={periodeLabel}
           value={formatRupiah(ringkas?.total_pendapatan)}
           sub={hargaRata ? `Harga rata-rata ${formatRupiah(hargaRata)} / liter` : 'Belum ada transaksi'}
           icon={<><circle cx="12" cy="12" r="9" /><path d="M15 9.5a3 3 0 0 0-3-1.5c-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2a3 3 0 0 1-3-1.5" /><path d="M12 6.5v11" /></>}
@@ -242,16 +232,27 @@ export default function Sales() {
       {/* Filter */}
       <div className="flex items-center gap-3 mb-[22px] flex-wrap">
         <span className="text-[13px] text-tinta-60 font-semibold">Periode:</span>
-        <div className="inline-flex gap-[2px] border border-border bg-permukaan rounded-full p-[3px]">
-          {PERIODS.map((p) => (
+        <select
+          aria-label="Tahun"
+          value={tahun}
+          onChange={(e) => setTahun(Number(e.target.value))}
+          className="form-select !w-auto !py-[7px] text-[13px] font-semibold"
+        >
+          {daftarTahun.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+        <div className="inline-flex flex-wrap gap-[2px] border border-border bg-permukaan rounded-[20px] p-[3px] max-w-full">
+          {[['all', 'Setahun'], ...MONTHS.map((m, i) => [i + 1, m])].map(([key, label]) => (
             <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`text-[13px] font-semibold px-[14px] py-[7px] rounded-full transition-colors ${
-                period === p.key ? 'bg-olive text-white' : 'text-tinta-60 hover:text-tinta'
+              key={key}
+              onClick={() => setBulan(key)}
+              title={key === 'all' ? `Januari–Desember ${tahun}` : `${MONTHS_FULL[key - 1]} ${tahun}`}
+              className={`text-[13px] font-semibold px-[12px] py-[7px] rounded-full transition-colors ${
+                bulan === key ? 'bg-olive text-white' : 'text-tinta-60 hover:text-tinta'
               }`}
             >
-              {p.label}
+              {label}
             </button>
           ))}
         </div>
@@ -262,7 +263,7 @@ export default function Sales() {
         <div className="card-hd">
           <div>
             <h3 className="text-[16px] font-semibold">Penjualan per bulan</h3>
-            <div className="text-[13px] text-tinta-60">Liter terjual · {periodLabel('all')}</div>
+            <div className="text-[13px] text-tinta-60">Liter terjual · Januari–Desember {tahun}</div>
           </div>
           <div className="flex gap-[18px] text-[12.5px] text-tinta-60">
             <span className="inline-flex items-center"><i className="w-3 h-3 rounded-sm bg-amber inline-block mr-[7px]" />Periode dipilih</span>
@@ -286,7 +287,7 @@ export default function Sales() {
       <Reveal delay={90} className="card">
         <div className="card-hd">
           <h3 className="text-[16px] font-semibold">Riwayat penjualan</h3>
-          <span className="text-[13px] text-tinta-60">{periodLabel(period)}</span>
+          <span className="text-[13px] text-tinta-60">{periodeLabel}</span>
         </div>
         <DataTable
           columns={columns}
