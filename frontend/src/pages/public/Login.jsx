@@ -1,20 +1,20 @@
 import { useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { ROLE_META, ROLES } from '../../lib/roles';
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
 
 export default function Login() {
-  const { login, loading } = useAuth();
+  const { login, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const tujuan = location.state?.from?.pathname || '/dashboard';
 
+  const [role, setRole] = useState(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [alert, setAlert] = useState(null); // { message, variant: 'error' | 'warning' }
-  const [shakeField, setShakeField] = useState(null); // 'user' | 'pass'
+  const [shakeField, setShakeField] = useState(null); // 'role' | 'user' | 'pass'
 
   const userRef = useRef(null);
   const passRef = useRef(null);
@@ -34,6 +34,11 @@ export default function Login() {
     const u = username.trim();
     const p = password;
 
+    if (!role) {
+      setAlert({ message: 'Pilih dulu role akun yang akan dipakai untuk masuk.', variant: 'error' });
+      triggerShake('role');
+      return;
+    }
     if (!u && !p) {
       setAlert({ message: 'Yuk isi dulu username dan kata sandinya sebelum masuk.', variant: 'error' });
       triggerShake('user');
@@ -61,8 +66,8 @@ export default function Login() {
 
     clearAlert();
     try {
-      await login(u, p);
-      navigate(tujuan, { replace: true });
+      await login(u, p, role);
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setAlert({ message: err.message || 'Gagal masuk. Coba lagi, ya.', variant: 'error' });
       triggerShake('pass');
@@ -76,6 +81,9 @@ export default function Login() {
       variant: 'warning',
     });
   }
+
+  // Sudah login → langsung ke dashboard sesuai role.
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const alertCls =
     alert?.variant === 'warning'
@@ -117,7 +125,7 @@ export default function Login() {
             </p>
             <h2 className="text-[30px] font-semibold mb-2">Masuk ke AMOR</h2>
             <p className="text-[15px] text-tinta-60">
-              Gunakan username dan kata sandi yang diberikan pengelola.
+              Pilih role, lalu gunakan username dan kata sandi yang diberikan pengelola.
             </p>
           </div>
 
@@ -143,6 +151,33 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-[18px]">
+            <fieldset className={`flex flex-col gap-[7px] ${shakeField === 'role' ? 'shake' : ''}`}>
+              <legend className="text-[13.5px] font-semibold mb-[7px]">Masuk sebagai</legend>
+              <div role="radiogroup" className="grid grid-cols-3 gap-2 max-[420px]:grid-cols-1">
+                {ROLES.map((r) => {
+                  const aktif = role === r;
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      role="radio"
+                      aria-checked={aktif}
+                      title={ROLE_META[r].desc}
+                      onClick={() => { setRole(r); clearAlert(); }}
+                      className={`text-left border rounded-md px-3 py-[10px] transition-colors ${
+                        aktif
+                          ? 'border-olive bg-olive-lembut text-olive'
+                          : 'border-border bg-permukaan text-tinta-60 hover:border-border-kuat hover:text-tinta'
+                      }`}
+                    >
+                      <span className="block text-[13.5px] font-semibold">{ROLE_META[r].label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {role && <p className="text-[12.5px] text-tinta-40">{ROLE_META[role].desc}.</p>}
+            </fieldset>
+
             <div className={`flex flex-col gap-[7px] ${shakeField === 'user' ? 'shake' : ''}`}>
               <label htmlFor="username" className="text-[13.5px] font-semibold">Username</label>
               <div className="relative flex items-center">

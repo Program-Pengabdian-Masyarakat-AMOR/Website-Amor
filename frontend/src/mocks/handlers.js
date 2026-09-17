@@ -18,6 +18,15 @@ let members = membersSeed.map((m) => ({ ...m }));
 let sales = salesSeed.map((s) => ({ ...s }));
 let production = productionLogs.map((p) => ({ ...p }));
 let control = JSON.parse(JSON.stringify(controlDefault));
+let landingStats = {
+  items: [
+    { value: '1.240', unit: 'kg', caption: 'Sampah plastik diolah', visible: true },
+    { value: '760', unit: 'L', caption: 'Minyak dihasilkan', visible: true },
+    { value: '2', unit: 'titik', caption: 'Reaktor pirolisis', visible: true },
+  ],
+  updated_at: null,
+  updated_by: null,
+};
 
 const nextId = (arr) => (arr.length ? Math.max(...arr.map((x) => x.id)) + 1 : 1);
 
@@ -72,15 +81,63 @@ function monthlyHealthMock() {
 }
 
 export const handlers = [
-  // POST /api/auth/login → { token, role }
+  // POST /api/auth/login { username, password, role } → { token, role, username }
   http.post(`${BASE}/auth/login`, async ({ request }) => {
-    const { username, password } = await request.json();
-    if (!username || !password) {
-      return HttpResponse.json({ message: 'Username dan kata sandi wajib diisi.' }, { status: 400 });
+    const { username, password, role } = await request.json();
+    if (!username || !password || !role) {
+      return HttpResponse.json({ message: 'Role, username, dan kata sandi wajib diisi.' }, { status: 400 });
     }
-    const found = users.find((u) => u.username === username && u.password === password);
-    const role = found ? found.role : 'operator';
-    return HttpResponse.json({ token: `mock.${btoa(username)}.${Date.now()}`, role });
+    const found = users.find((u) => u.username === username && u.password === password && u.role === role);
+    if (!found) {
+      return HttpResponse.json({ message: 'Role, username, atau kata sandi tidak sesuai.' }, { status: 401 });
+    }
+    return HttpResponse.json({ token: `mock.${btoa(username)}.${Date.now()}`, role: found.role, username });
+  }),
+
+  // GET /api/system/status (admin)
+  http.get(`${BASE}/system/status`, () =>
+    HttpResponse.json({
+      overall: 'normal',
+      issues: [],
+      checked_at: new Date().toISOString(),
+      server: { started_at: new Date(Date.now() - 3600e3).toISOString(), uptime_s: 3600, node: 'mock', env: 'mock', memory_mb: 90 },
+      firebase: {
+        configured: false, mode: 'simulator', connected: true,
+        last_connected_at: null, last_disconnected_at: null,
+        last_monitoring_at: new Date().toISOString(), last_monitoring_age_s: 2,
+        last_input_at: null, last_write_at: null, last_write_error: null,
+        socket_clients: 1, minute_points: sensorSeries.length, active_session: null, stale: false, stale_after_s: 120,
+      },
+      database: {
+        ok: true, latency_ms: 3,
+        counts: { production: production.length, health: healthStatus.length, feeder: 0, members: members.length, users: users.length },
+        last_production: production[0] ? { session_id: production[0].session_id, created_at: production[0].created_at } : null,
+      },
+      ai: { runtime: 'fallback', runtime_failure: null, models: {}, feeder_mode: control.ai_feeder?.mode || 'off' },
+      telemetry: sensorLatest,
+    })
+  ),
+
+  // GET /api/recap/:jenis?dari&sampai (admin)
+  http.get(`${BASE}/recap/:jenis`, ({ params, request }) => {
+    const url = new URL(request.url);
+    const dari = url.searchParams.get('dari');
+    const sampai = url.searchParams.get('sampai');
+    const sumber = { production, health: healthStatus, feeder: [] }[params.jenis];
+    if (!sumber) return HttpResponse.json({ message: 'Jenis rekap tidak dikenal.' }, { status: 404 });
+    const rows = sumber.filter((r) => {
+      const tgl = String(r.created_at).slice(0, 10);
+      return (!dari || tgl >= dari) && (!sampai || tgl <= sampai);
+    });
+    return HttpResponse.json({ jenis: params.jenis, dari, sampai, total: rows.length, rows });
+  }),
+
+  // GET/PUT /api/site-content/landing-stats (GET publik, PUT management)
+  http.get(`${BASE}/site-content/landing-stats`, () => HttpResponse.json(landingStats)),
+  http.put(`${BASE}/site-content/landing-stats`, async ({ request }) => {
+    const body = await request.json();
+    landingStats = { items: body.items, updated_at: new Date().toISOString(), updated_by: 'manajemen' };
+    return HttpResponse.json(landingStats);
   }),
 
   // GET /api/sensor-data/latest → telemetri terkini + tren

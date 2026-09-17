@@ -1,6 +1,8 @@
 // Wrapper fetch terpusat — SEMUA akses data lewat sini (lihat docs/CLAUDE.md).
 // Komponen tidak memanggil fetch langsung. Di FASE 2 cukup ganti BASE_URL.
 
+import { LOGIN_PATH } from '../lib/roles';
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'amor.token';
 
@@ -52,8 +54,8 @@ async function request(path, { method = 'GET', body, headers, ...rest } = {}) {
       clearToken();
       localStorage.removeItem('amor.role');
       localStorage.removeItem('amor.username');
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.assign('/login');
+      if (typeof window !== 'undefined' && window.location.pathname !== LOGIN_PATH) {
+        window.location.assign(LOGIN_PATH);
       }
     }
     const message = (data && data.message) || `Permintaan gagal (${res.status})`;

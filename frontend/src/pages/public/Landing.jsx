@@ -1,13 +1,34 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import PublicNavbar from '../../components/layout/PublicNavbar';
 import ImageSlot from '../../components/ImageSlot';
 import Reveal from '../../components/Reveal';
+import { api } from '../../services/api';
 
-const STATS = [
-  { v: '1.240', u: 'kg', cap: 'Sampah plastik diolah' },
-  { v: '760', u: 'L', cap: 'Minyak dihasilkan' },
-  { v: '2', u: 'titik', cap: 'Reaktor pirolisis' },
+// Nilai cadangan bila API belum bisa dihubungi. Nilai aktual diedit role management
+// lewat Dashboard → Data Publik (GET/PUT /api/site-content/landing-stats).
+const DEFAULT_STATS = [
+  { value: '1.240', unit: 'kg', caption: 'Sampah plastik diolah' },
+  { value: '760', unit: 'L', caption: 'Minyak dihasilkan' },
+  { value: '2', unit: 'titik', caption: 'Reaktor pirolisis' },
 ];
+
+function useLandingStats() {
+  const [stats, setStats] = useState(DEFAULT_STATS);
+  useEffect(() => {
+    let aktif = true;
+    api
+      .get('/site-content/landing-stats')
+      .then((res) => {
+        const items = (res?.items || []).filter((it) => it.visible !== false);
+        if (aktif && items.length) setStats(items);
+      })
+      .catch(() => {}); // tetap tampilkan nilai cadangan
+    return () => {
+      aktif = false;
+    };
+  }, []);
+  return stats;
+}
 
 const STEPS = [
   {
@@ -98,7 +119,11 @@ const svgProps = {
   strokeLinejoin: 'round',
 };
 
+// Kelas literal agar terbaca Tailwind (maks. 4 statistik, lihat backend lib/siteContent.js).
+const STAT_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' };
+
 export default function Landing() {
+  const stats = useLandingStats();
   return (
     <div className="bg-krem text-tinta" style={{ scrollBehavior: 'smooth' }}>
       <PublicNavbar />
@@ -139,19 +164,19 @@ export default function Landing() {
             </div>
           </Reveal>
 
-          <div className="grid grid-cols-3 border-t border-border mt-16 max-[860px]:grid-cols-1">
-            {STATS.map((s, i) => (
+          <div className={`grid ${STAT_COLS[stats.length] || 'grid-cols-4'} border-t border-border mt-16 max-[860px]:grid-cols-1`}>
+            {stats.map((s, i) => (
               <Reveal
                 as="div"
-                key={s.cap}
+                key={`${i}-${s.caption}`}
                 delay={i * 90}
-                className={`py-[26px] px-7 ${i === 0 ? 'pl-0' : ''} ${i === STATS.length - 1 ? 'pr-0' : 'border-r border-border'} max-[860px]:px-0 max-[860px]:py-[22px] max-[860px]:border-r-0 ${i < STATS.length - 1 ? 'max-[860px]:border-b max-[860px]:border-border' : ''}`}
+                className={`py-[26px] px-7 ${i === 0 ? 'pl-0' : ''} ${i === stats.length - 1 ? 'pr-0' : 'border-r border-border'} max-[860px]:px-0 max-[860px]:py-[22px] max-[860px]:border-r-0 ${i < stats.length - 1 ? 'max-[860px]:border-b max-[860px]:border-border' : ''}`}
               >
                 <div className="font-heading font-semibold text-[34px] leading-none tnum">
-                  <span className="text-amber-teks">{s.v}</span>
-                  {s.u && ` ${s.u}`}
+                  <span className="text-amber-teks">{s.value}</span>
+                  {s.unit && ` ${s.unit}`}
                 </div>
-                <div className="text-[13px] text-tinta-40 mt-2">{s.cap}</div>
+                <div className="text-[13px] text-tinta-40 mt-2">{s.caption}</div>
               </Reveal>
             ))}
           </div>
@@ -348,11 +373,6 @@ export default function Landing() {
           <p className="text-[13px] text-tinta-40">© 2026 AMOR</p>
         </div>
       </footer>
-
-      {/* Tautan tersembunyi agar Login tetap dapat diakses langsung */}
-      <Link to="/login" className="sr-only">
-        Masuk ke AMOR
-      </Link>
     </div>
   );
 }

@@ -24,10 +24,10 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  async function login(usernameInput, password) {
+  async function login(usernameInput, password, roleInput) {
     setLoading(true);
     try {
-      const data = await api.post('/auth/login', { username: usernameInput, password });
+      const data = await api.post('/auth/login', { username: usernameInput, password, role: roleInput });
       setToken(data.token);
       localStorage.setItem(ROLE_KEY, data.role);
       localStorage.setItem(USER_KEY, usernameInput);

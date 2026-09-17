@@ -8,7 +8,7 @@ import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { hitungAlert, statusDariAlert, statusSuhu, DEFAULT_SETPOINTS } from '../../lib/thresholds';
-import { formatAngka, formatRupiah, formatJam } from '../../lib/format';
+import { formatAngka, formatJam } from '../../lib/format';
 
 const LineChart = lazy(() => import('../../components/LineChart'));
 
@@ -51,10 +51,7 @@ export default function DashboardHome() {
   const sensor = useApi(() => api.get('/sensor-data/latest'), []);
   const produksi = useApi(() => api.get('/production-logs'), []);
   const health = useApi(() => api.get('/health-status'), []);
-  const sales = useApi(
-    () => Promise.all([api.get('/sales/summary?dari=2026-06-01'), api.get('/sales/summary')]),
-    []
-  );
+  const kontrol = useApi(() => api.get('/control'), []);
 
   const latest = sensor.data?.latest;
   const sesiTerbaru = produksi.data?.[0];
@@ -77,7 +74,7 @@ export default function DashboardHome() {
     .map((p) => ({ label: sesiLabel(p.session_id), yield: p.yield_percent }));
 
   const alerts = (health.data?.history || []).slice(0, 4);
-  const [bulanIni, total] = sales.data || [];
+  const sp = kontrol.data;
 
   return (
     <>
@@ -200,24 +197,25 @@ export default function DashboardHome() {
 
         {/* KOLOM KANAN */}
         <div className="flex flex-col gap-5">
-          {/* PENJUALAN */}
+          {/* KONTROL AKTIF */}
           <Reveal delay={40}>
           <CardShell
-            title="Penjualan minyak"
-            action={<Link to="/dashboard/sales" className="text-[13px] text-amber-teks font-medium hover:underline">Rincian</Link>}
+            title="Kontrol aktif"
+            action={<Link to="/dashboard/kontrol" className="text-[13px] text-amber-teks font-medium hover:underline">Atur</Link>}
           >
-            <div className="p-[22px] flex flex-col gap-4">
-              {sales.loading ? (
-                <div className="text-tinta-40">Memuat ringkasan…</div>
-              ) : sales.error ? (
-                <div className="text-critical-teks">Gagal memuat ringkasan penjualan.</div>
+            <div className="p-[22px] flex flex-col gap-3">
+              {kontrol.loading ? (
+                <div className="text-tinta-40">Memuat kontrol…</div>
+              ) : kontrol.error ? (
+                <div className="text-critical-teks">Gagal memuat data kontrol.</div>
               ) : (
                 <>
-                  <SaleRow caption="Bulan ini" sub="Juni 2026" summary={bulanIni} />
-                  <SaleRow caption="Total keseluruhan" sub="Sejak Tahun 1" summary={total} total />
-                  <p className="text-[12px] text-tinta-40 leading-[1.5]">
-                    Nilai mengikuti catatan penjualan pada halaman Penjualan.
-                  </p>
+                  <KontrolRow label="Setpoint pirolisis" value={`${formatAngka(sp?.pirolisis?.bawah)}–${formatAngka(sp?.pirolisis?.atas)} °C`} />
+                  <KontrolRow label="Setpoint tungku" value={`${formatAngka(sp?.tungku?.bawah)}–${formatAngka(sp?.tungku?.atas)} °C`} />
+                  <KontrolRow label="Blower" value={sp?.blower ? 'ON' : 'OFF'} on={sp?.blower} />
+                  <KontrolRow label="Feeder" value={sp?.feeder ? 'ON' : 'OFF'} on={sp?.feeder} />
+                  <KontrolRow label="Alarm gas" value={sp?.alarm !== false ? 'Aktif' : 'Nonaktif'} on={sp?.alarm !== false} />
+                  <KontrolRow label="Mode AI feeder" value={String(sp?.ai_feeder?.mode || '—').toUpperCase()} />
                 </>
               )}
             </div>
@@ -226,10 +224,7 @@ export default function DashboardHome() {
 
           {/* ALERT */}
           <Reveal delay={120}>
-          <CardShell
-            title="Alert terbaru · Health Check"
-            action={<Link to="/dashboard/health" className="text-[13px] text-amber-teks font-medium hover:underline">Semua log</Link>}
-          >
+          <CardShell title="Alert terbaru · Health Check">
             <div className="flex flex-col">
               {health.loading && <div className="px-[22px] py-8 text-tinta-40">Memuat alert…</div>}
               {!health.loading && health.error && (
@@ -268,22 +263,12 @@ function Reading({ label, value, unit, sub, warn, icon, last }) {
   );
 }
 
-function SaleRow({ caption, sub, summary, total }) {
+function KontrolRow({ label, value, on }) {
+  const tone = on === true ? 'text-normal-teks' : on === false ? 'text-tinta-40' : 'text-tinta';
   return (
-    <div className={`flex items-center justify-between px-4 py-[14px] rounded-md border ${total ? 'bg-olive-lembut border-[#D2DCCC]' : 'bg-permukaan border-border'}`}>
-      <div className="text-[13px] text-tinta-60">
-        <b className="block text-[14px] text-tinta font-semibold mb-[2px]">{caption}</b>
-        {sub}
-      </div>
-      <div className="text-right">
-        <div className="font-body font-bold text-[22px] tnum leading-none">
-          {formatAngka(summary?.total_liter)}
-          <small className="text-[13px] text-tinta-60 font-semibold"> liter</small>
-        </div>
-        <div className="text-[13px] text-tinta-60 mt-[5px] tnum">
-          ≈ <b className="text-amber-teks font-semibold">{formatRupiah(summary?.total_pendapatan)}</b>
-        </div>
-      </div>
+    <div className="flex items-center justify-between gap-3 px-4 py-[11px] rounded-md border border-border bg-permukaan">
+      <span className="text-[13px] text-tinta-60">{label}</span>
+      <b className={`text-[14px] font-semibold tnum ${tone}`}>{value}</b>
     </div>
   );
 }
