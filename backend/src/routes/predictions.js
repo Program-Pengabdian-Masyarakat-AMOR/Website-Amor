@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth } from '../middleware/auth.js';
+import { allow } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { predictionDTO } from '../lib/serializers.js';
 import { predictYield } from '../services/aiEngine.js';
@@ -11,7 +11,7 @@ const router = Router();
 // Backward-compatible: baris lama yang predictedYield-nya null akan di-backfill dari ProductionLog.
 router.get(
   '/',
-  requireAuth,
+  allow('admin', 'operator'),
   asyncHandler(async (req, res) => {
     let rows = await prisma.prediction.findMany({ orderBy: { id: 'desc' }, take: 20 });
 

@@ -10,6 +10,7 @@ async function main() {
   const users = [
     { username: 'admin', password: 'admin123', role: 'admin' },
     { username: 'operator_rw04', password: 'operator123', role: 'operator' },
+    { username: 'manajemen', password: 'manajemen123', role: 'management' },
   ];
   for (const u of users) {
     const passwordHash = await bcrypt.hash(u.password, 10);
@@ -111,7 +112,7 @@ async function main() {
     ],
   });
 
-  console.log('[seed] selesai ✓  (login: admin/admin123 atau operator_rw04/operator123)');
+  console.log('[seed] selesai ✓  (login: admin/admin123, operator_rw04/operator123, manajemen/manajemen123)');
 }
 
 main()

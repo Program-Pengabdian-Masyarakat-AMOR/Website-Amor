@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth } from '../middleware/auth.js';
+import { allow } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { productionDTO } from '../lib/serializers.js';
 import { DEFAULT_SETPOINTS } from '../lib/thresholds.js';
@@ -18,7 +18,7 @@ function cleanBand(input, fallback) {
 // GET /api/production-logs
 router.get(
   '/',
-  requireAuth,
+  allow('admin', 'operator'),
   asyncHandler(async (req, res) => {
     const rows = await prisma.productionLog.findMany({ orderBy: { createdAt: 'desc' } });
     res.json(rows.map(productionDTO));
@@ -28,7 +28,7 @@ router.get(
 // POST /api/production-logs (manual/entri backend)
 router.post(
   '/',
-  requireAuth,
+  allow('admin', 'operator'),
   asyncHandler(async (req, res) => {
     const b = req.body || {};
     const sampah = Number(b.berat_sampah_total) || 0;

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { allow } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { getControl, setSetpoint, setKontrol } from '../services/firebaseBridge.js';
 
@@ -21,12 +21,12 @@ function validasiGrup(nama, grup) {
 }
 
 // GET /api/control → { pirolisis:{bawah,atas}, tungku:{bawah,atas}, blower, feeder }
-router.get('/', requireAuth, (req, res) => res.json(getControl()));
+router.get('/', allow('admin', 'operator'), (req, res) => res.json(getControl()));
 
 // PUT /api/control/setpoint (integer °C) → Firebase input (key datar)
 router.put(
   '/setpoint',
-  requireAuth,
+  allow('operator'),
   asyncHandler(async (req, res) => {
     const { pirolisis, tungku } = req.body || {};
     if (pirolisis == null && tungku == null) {
@@ -45,7 +45,7 @@ router.put(
 // PUT /api/control/kontrol (boolean) → Firebase input/blower, input/feeder
 router.put(
   '/kontrol',
-  requireAuth,
+  allow('operator'),
   asyncHandler(async (req, res) => {
     const { blower, feeder, alarm } = req.body || {};
     res.json(await setKontrol({ blower, feeder, alarm }));

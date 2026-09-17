@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { allow } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { getAiEngineStatus, warmupAiEngine } from '../services/aiEngine.js';
 import { evaluateMonthlyHealth, currentMonthKey } from '../services/monthlyHealth.js';
@@ -7,14 +7,13 @@ import { getFeederAutomationStatus, setFeederAutomationMode } from '../services/
 
 const router = Router();
 
-router.get('/status', requireAuth, (req, res) => {
+router.get('/status', allow('admin', 'operator'), (req, res) => {
   res.json({ engine: getAiEngineStatus(), feeder: getFeederAutomationStatus() });
 });
 
 router.post(
   '/warmup',
-  requireAuth,
-  requireRole('admin'),
+  allow('admin'),
   asyncHandler(async (req, res) => {
     res.json(await warmupAiEngine());
   })
@@ -22,7 +21,7 @@ router.post(
 
 router.get(
   '/monthly-health',
-  requireAuth,
+  allow('admin', 'operator'),
   asyncHandler(async (req, res) => {
     const month = req.query.month || currentMonthKey();
     const result = await evaluateMonthlyHealth(month);
@@ -32,8 +31,7 @@ router.get(
 
 router.put(
   '/feeder-mode',
-  requireAuth,
-  requireRole('admin'),
+  allow('operator'),
   asyncHandler(async (req, res) => {
     try {
       res.json(await setFeederAutomationMode(req.body?.mode));
