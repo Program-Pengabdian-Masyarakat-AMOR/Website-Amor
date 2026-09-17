@@ -6,6 +6,7 @@ import { useToast } from '../../hooks/useToast';
 import SalesSummaryCard from '../../components/SalesSummaryCard';
 import DataTable from '../../components/DataTable';
 import ChartFallback from '../../components/ChartFallback';
+import YearPicker from '../../components/YearPicker';
 import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
@@ -40,14 +41,6 @@ export default function Sales() {
   const [deleting, setDeleting] = useState(false);
 
   const sales = useMemo(() => allSales.data || [], [allSales.data]);
-
-  // Pilihan tahun = tahun yang punya transaksi + tahun berjalan.
-  const daftarTahun = useMemo(() => {
-    const set = new Set([sekarang.getFullYear(), tahun]);
-    sales.forEach((s) => set.add(Number(s.tanggal.slice(0, 4))));
-    return [...set].filter(Number.isFinite).sort((a, b) => b - a);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales, tahun]);
 
   // Baris untuk periode terpilih (urut tanggal terbaru dulu).
   const rows = useMemo(
@@ -232,16 +225,7 @@ export default function Sales() {
       {/* Filter */}
       <div className="flex items-center gap-3 mb-[22px] flex-wrap">
         <span className="text-[13px] text-tinta-60 font-semibold">Periode:</span>
-        <select
-          aria-label="Tahun"
-          value={tahun}
-          onChange={(e) => setTahun(Number(e.target.value))}
-          className="form-select !w-auto !py-[7px] text-[13px] font-semibold"
-        >
-          {daftarTahun.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+        <YearPicker value={tahun} onChange={setTahun} />
         <div className="inline-flex flex-wrap gap-[2px] border border-border bg-permukaan rounded-[20px] p-[3px] max-w-full">
           {[['all', 'Setahun'], ...MONTHS.map((m, i) => [i + 1, m])].map(([key, label]) => (
             <button
