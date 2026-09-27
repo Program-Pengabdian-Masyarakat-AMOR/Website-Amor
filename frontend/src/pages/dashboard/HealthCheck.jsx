@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import Topbar from '../../components/layout/Topbar';
 import HealthStatusBadge from '../../components/HealthStatusBadge';
 import DataTable from '../../components/DataTable';
@@ -6,6 +6,7 @@ import ChartFallback from '../../components/ChartFallback';
 import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
+import { getSocket } from '../../services/socket';
 import { statusSuhu, hitungAlert, statusDariAlert } from '../../lib/thresholds';
 import { formatAngka, formatJam, formatTanggal } from '../../lib/format';
 
@@ -55,9 +56,35 @@ export default function HealthCheck() {
   const sensor = useApi(() => api.get('/sensor-data/latest'), []);
   const prediksi = useApi(() => api.get('/predictions'), []);
   const kontrol = useApi(() => api.get('/control'), []);
+  const [liveLatest, setLiveLatest] = useState(null);
+  const [liveControl, setLiveControl] = useState(null);
+  const [liveHealth, setLiveHealth] = useState(null);
+  const [socketOk, setSocketOk] = useState(false);
 
-  const latest = sensor.data?.latest;
-  const sp = kontrol.data;
+  useEffect(() => {
+    const socket = getSocket();
+    const onSensor = (payload) => setLiveLatest(payload);
+    const onHealth = (payload) => setLiveHealth(payload);
+    const onControl = (payload) => setLiveControl(payload);
+    const onConnect = () => setSocketOk(true);
+    const onDisconnect = () => setSocketOk(false);
+    setSocketOk(socket.connected);
+    socket.on('sensor-update', onSensor);
+    socket.on('health-update', onHealth);
+    socket.on('control-update', onControl);
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    return () => {
+      socket.off('sensor-update', onSensor);
+      socket.off('health-update', onHealth);
+      socket.off('control-update', onControl);
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+    };
+  }, []);
+
+  const latest = liveLatest || sensor.data?.latest;
+  const sp = liveControl || kontrol.data;
 
   function paramSuhu(key, label, nilai, band) {
     const running = latest?.status_sistem === 'running';
@@ -104,7 +131,7 @@ export default function HealthCheck() {
     latest && sp
       ? hitungAlert({ suhuPirolisis: latest.suhu_pirolisis, suhuTungku: latest.suhu_tungku, statusGas: latest.status_gas, statusSistem: latest.status_sistem, setpoint: sp })
       : [];
-  const status = latest && sp ? statusDariAlert(alerts) : health.data?.current?.status || 'normal';
+  const status = latest && sp ? statusDariAlert(alerts) : liveHealth?.status || health.data?.current?.status || 'normal';
   const ui = STATUS_BIG[status];
 
   // Tabel riwayat
@@ -141,14 +168,14 @@ export default function HealthCheck() {
       <Topbar
         crumb="Beranda · Health Check"
         title="Health Check Mesin"
-        live
+        live={socketOk}
       />
 
       {/* Status + parameter */}
       <div className="grid grid-cols-[1fr_1.18fr] gap-5 items-start mb-6 max-[1080px]:grid-cols-1">
         {/* Big status */}
         <Reveal className="card overflow-hidden h-full">
-          {health.loading ? (
+          {health.loading && !latest && !liveHealth ? (
             <div className="p-8 text-tinta-40">Memuat status…</div>
           ) : (
             <div className={`p-7 flex flex-col h-full bg-gradient-to-b ${ui.tint} to-permukaan`}>
@@ -178,7 +205,7 @@ export default function HealthCheck() {
             <span className="text-[13px] text-tinta-60">{params.length} parameter dipantau</span>
           </div>
           <div className="py-2">
-            {(sensor.loading || kontrol.loading) && <div className="px-[22px] py-8 text-tinta-40">Memuat parameter…</div>}
+            {((sensor.loading && !latest) || (kontrol.loading && !sp)) && <div className="px-[22px] py-8 text-tinta-40">Memuat parameter…</div>}
             {params.map((p) => {
               const crit = p.violated && p.severity === 'critical';
               const warn = p.violated && p.severity !== 'critical';
@@ -226,9 +253,9 @@ export default function HealthCheck() {
         </div>
         <DataTable
           columns={histColumns}
-          rows={health.data?.history || []}
-          loading={health.loading}
-          error={health.error}
+          rows={liveHealth ? [liveHealth, ...(health.data?.history || []).filter((r) => r.id !== liveHealth.id)] : health.data?.history || []}
+          loading={health.loading && !liveHealth}
+          error={liveHealth ? null : health.error}
           emptyMessage="Belum ada riwayat health check."
         />
       </Reveal>

@@ -13,7 +13,7 @@ model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique
   passwordHash String
-  role         String   @default("operator") // admin | operator
+  role         String   @default("operator") // admin | operator | management
   createdAt    DateTime @default(now())
 }
 
@@ -80,4 +80,13 @@ model FeederMovement {
   beratSampah   Float?
   aiScore       Float?
   createdAt    DateTime @default(now())
+}
+
+// Konten publik yang bisa diedit role management (mis. statistik produksi landing page).
+// value berisi JSON string agar bentuk konten fleksibel tanpa migration baru.
+model SiteContent {
+  key       String   @id
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

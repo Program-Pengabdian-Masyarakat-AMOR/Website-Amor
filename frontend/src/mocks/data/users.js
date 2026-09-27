@@ -1,4 +1,4 @@
-// users: id, username, password*, role (admin|operator), created_at
+// users: id, username, password*, role (admin|operator|management), created_at
 // *password TIDAK PERNAH dikirim ke FE — hanya dipakai mock untuk validasi.
 export const users = [
   {
@@ -14,5 +14,12 @@ export const users = [
     password: 'operator123',
     role: 'operator',
     created_at: '2026-02-01T08:00:00.000Z',
+  },
+  {
+    id: 3,
+    username: 'manajemen',
+    password: 'manajemen123',
+    role: 'management',
+    created_at: '2026-09-17T08:00:00.000Z',
   },
 ];

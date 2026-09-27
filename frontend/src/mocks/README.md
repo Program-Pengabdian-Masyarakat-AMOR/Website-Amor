@@ -79,7 +79,7 @@ Rumus: `yield_percent = (berat_minyak_total / berat_sampah_total) * 100`. UI men
 ## Endpoint
 
 ### Auth
-`POST /api/auth/login` · publik → `{ token, role }` (mock terima kombinasi valid apa pun) · `400 { message }` bila kosong.
+`POST /api/auth/login` · publik → `{ token, role }` setelah username/password valid · `400 { message }` bila kosong.
 
 ### Telemetri & produksi (IoT → Web)
 - `GET /api/sensor-data/latest` → `{ latest: telemetri, series: titik[] }` (`series` = log suhu **rata-rata per 1 menit**, bukan telemetri instan)

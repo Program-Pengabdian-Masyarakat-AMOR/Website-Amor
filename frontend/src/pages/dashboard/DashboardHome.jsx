@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Topbar from '../../components/layout/Topbar';
 import HealthStatusBadge from '../../components/HealthStatusBadge';
@@ -6,9 +6,10 @@ import ChartFallback from '../../components/ChartFallback';
 import Reveal from '../../components/Reveal';
 import { useApi } from '../../hooks/useApi';
 import { api } from '../../services/api';
+import { getSocket } from '../../services/socket';
 import { useAuth } from '../../context/AuthContext';
 import { hitungAlert, statusDariAlert, statusSuhu, DEFAULT_SETPOINTS } from '../../lib/thresholds';
-import { formatAngka, formatRupiah, formatJam } from '../../lib/format';
+import { formatAngka, formatJam } from '../../lib/format';
 
 const LineChart = lazy(() => import('../../components/LineChart'));
 
@@ -51,13 +52,43 @@ export default function DashboardHome() {
   const sensor = useApi(() => api.get('/sensor-data/latest'), []);
   const produksi = useApi(() => api.get('/production-logs'), []);
   const health = useApi(() => api.get('/health-status'), []);
-  const sales = useApi(
-    () => Promise.all([api.get('/sales/summary?dari=2026-06-01'), api.get('/sales/summary')]),
-    []
-  );
+  const kontrol = useApi(() => api.get('/control'), []);
+  const [liveLatest, setLiveLatest] = useState(null);
+  const [liveControl, setLiveControl] = useState(null);
+  const [liveHealth, setLiveHealth] = useState(null);
+  const [socketOk, setSocketOk] = useState(false);
 
-  const latest = sensor.data?.latest;
+  useEffect(() => {
+    const socket = getSocket();
+    const onSensor = (payload) => setLiveLatest(payload);
+    const onControl = (payload) => setLiveControl(payload);
+    const onHealth = (payload) => setLiveHealth(payload);
+    const onConnect = () => setSocketOk(true);
+    const onDisconnect = () => setSocketOk(false);
+    setSocketOk(socket.connected);
+    socket.on('sensor-update', onSensor);
+    socket.on('control-update', onControl);
+    socket.on('health-update', onHealth);
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    return () => {
+      socket.off('sensor-update', onSensor);
+      socket.off('control-update', onControl);
+      socket.off('health-update', onHealth);
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+    };
+  }, []);
+
+  const latest = liveLatest || sensor.data?.latest;
   const sesiTerbaru = produksi.data?.[0];
+
+  const controlLive = liveControl || kontrol.data;
+  const activeSetpoint = {
+    pirolisis: controlLive?.pirolisis || DEFAULT_SETPOINTS.pirolisis,
+    tungku: controlLive?.tungku || DEFAULT_SETPOINTS.tungku,
+  };
+  const setpointSource = controlLive ? 'Setpoint dinamis aktif' : 'Setpoint default';
 
   const alertsMesin = latest
     ? hitungAlert({
@@ -65,7 +96,7 @@ export default function DashboardHome() {
         suhuTungku: latest.suhu_tungku,
         statusGas: latest.status_gas,
         statusSistem: latest.status_sistem,
-        setpoint: DEFAULT_SETPOINTS,
+        setpoint: activeSetpoint,
       })
     : [];
   const status = latest ? statusDariAlert(alertsMesin) : 'normal';
@@ -76,21 +107,21 @@ export default function DashboardHome() {
     .reverse()
     .map((p) => ({ label: sesiLabel(p.session_id), yield: p.yield_percent }));
 
-  const alerts = (health.data?.history || []).slice(0, 4);
-  const [bulanIni, total] = sales.data || [];
+  const alerts = (liveHealth ? [liveHealth, ...(health.data?.history || []).filter((r) => r.id !== liveHealth.id)] : health.data?.history || []).slice(0, 4);
+  const sp = controlLive;
 
   return (
     <>
-      <Topbar crumb="Beranda · Dashboard" title={`Selamat datang kembali, ${username || 'operator'}`} live />
+      <Topbar crumb="Beranda · Dashboard" title={`Selamat datang kembali, ${username || 'operator'}`} live={socketOk} />
 
       <div className="grid grid-cols-[1.62fr_1fr] gap-5 items-start max-[1080px]:grid-cols-1">
         {/* KOLOM KIRI */}
         <div className="flex flex-col gap-5">
           {/* STATUS MESIN */}
           <Reveal className="card overflow-hidden">
-            {sensor.loading ? (
+            {sensor.loading && !latest ? (
               <div className="px-[26px] py-10 text-tinta-40">Memuat status mesin…</div>
-            ) : sensor.error ? (
+            ) : sensor.error && !latest ? (
               <div className="px-[26px] py-10 text-critical-teks">Gagal memuat status mesin.</div>
             ) : (
               <>
@@ -123,16 +154,16 @@ export default function DashboardHome() {
                     label="Suhu pirolisis"
                     value={formatAngka(latest.suhu_pirolisis)}
                     unit="°C"
-                    sub={`Target ${DEFAULT_SETPOINTS.pirolisis.bawah}–${DEFAULT_SETPOINTS.pirolisis.atas} °C`}
-                    warn={latest.status_sistem === 'running' && statusSuhu(latest.suhu_pirolisis, DEFAULT_SETPOINTS.pirolisis) !== 'aman'}
+                    sub={`Target ${activeSetpoint.pirolisis.bawah}–${activeSetpoint.pirolisis.atas} °C · ${setpointSource}`}
+                    warn={latest.status_sistem === 'running' && statusSuhu(latest.suhu_pirolisis, activeSetpoint.pirolisis) !== 'aman'}
                     icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
                   />
                   <Reading
                     label="Suhu tungku"
                     value={formatAngka(latest.suhu_tungku)}
                     unit="°C"
-                    sub={`Target ${DEFAULT_SETPOINTS.tungku.bawah}–${DEFAULT_SETPOINTS.tungku.atas} °C`}
-                    warn={latest.status_sistem === 'running' && statusSuhu(latest.suhu_tungku, DEFAULT_SETPOINTS.tungku) !== 'aman'}
+                    sub={`Target ${activeSetpoint.tungku.bawah}–${activeSetpoint.tungku.atas} °C · ${setpointSource}`}
+                    warn={latest.status_sistem === 'running' && statusSuhu(latest.suhu_tungku, activeSetpoint.tungku) !== 'aman'}
                     icon={<path d="M14 14.76V4.5a2.5 2.5 0 0 0-5 0v10.26a4.5 4.5 0 1 0 5 0z" />}
                   />
                   <Reading
@@ -200,24 +231,25 @@ export default function DashboardHome() {
 
         {/* KOLOM KANAN */}
         <div className="flex flex-col gap-5">
-          {/* PENJUALAN */}
+          {/* KONTROL AKTIF */}
           <Reveal delay={40}>
           <CardShell
-            title="Penjualan minyak"
-            action={<Link to="/dashboard/sales" className="text-[13px] text-amber-teks font-medium hover:underline">Rincian</Link>}
+            title="Kontrol aktif"
+            action={<Link to="/dashboard/kontrol" className="text-[13px] text-amber-teks font-medium hover:underline">Atur</Link>}
           >
-            <div className="p-[22px] flex flex-col gap-4">
-              {sales.loading ? (
-                <div className="text-tinta-40">Memuat ringkasan…</div>
-              ) : sales.error ? (
-                <div className="text-critical-teks">Gagal memuat ringkasan penjualan.</div>
+            <div className="p-[22px] flex flex-col gap-3">
+              {kontrol.loading && !sp ? (
+                <div className="text-tinta-40">Memuat kontrol…</div>
+              ) : kontrol.error && !sp ? (
+                <div className="text-critical-teks">Gagal memuat data kontrol.</div>
               ) : (
                 <>
-                  <SaleRow caption="Bulan ini" sub="Juni 2026" summary={bulanIni} />
-                  <SaleRow caption="Total keseluruhan" sub="Sejak Tahun 1" summary={total} total />
-                  <p className="text-[12px] text-tinta-40 leading-[1.5]">
-                    Nilai mengikuti catatan penjualan pada halaman Penjualan.
-                  </p>
+                  <KontrolRow label="Setpoint pirolisis" value={`${formatAngka(activeSetpoint.pirolisis.bawah)}–${formatAngka(activeSetpoint.pirolisis.atas)} °C`} />
+                  <KontrolRow label="Setpoint tungku" value={`${formatAngka(activeSetpoint.tungku.bawah)}–${formatAngka(activeSetpoint.tungku.atas)} °C`} />
+                  <KontrolRow label="Blower" value={sp?.blower ? 'ON' : 'OFF'} on={sp?.blower} />
+                  <KontrolRow label="Feeder" value={sp?.feeder ? 'ON' : 'OFF'} on={sp?.feeder} />
+                  <KontrolRow label="Alarm gas" value={sp?.alarm !== false ? 'Aktif' : 'Nonaktif'} on={sp?.alarm !== false} />
+                  <KontrolRow label="Mode AI feeder" value={String(sp?.ai_feeder?.mode || '—').toUpperCase()} />
                 </>
               )}
             </div>
@@ -226,20 +258,17 @@ export default function DashboardHome() {
 
           {/* ALERT */}
           <Reveal delay={120}>
-          <CardShell
-            title="Alert terbaru · Health Check"
-            action={<Link to="/dashboard/health" className="text-[13px] text-amber-teks font-medium hover:underline">Semua log</Link>}
-          >
+          <CardShell title="Alert terbaru · Health Check">
             <div className="flex flex-col">
-              {health.loading && <div className="px-[22px] py-8 text-tinta-40">Memuat alert…</div>}
-              {!health.loading && health.error && (
+              {health.loading && !liveHealth && <div className="px-[22px] py-8 text-tinta-40">Memuat alert…</div>}
+              {!liveHealth && !health.loading && health.error && (
                 <div className="px-[22px] py-8 text-critical-teks">Gagal memuat alert.</div>
               )}
               {!health.loading && !health.error && alerts.length === 0 && (
                 <div className="px-[22px] py-8 text-tinta-40">Belum ada alert.</div>
               )}
-              {!health.loading &&
-                !health.error &&
+              {(!health.loading || liveHealth) &&
+                (!health.error || liveHealth) &&
                 alerts.map((a) => <AlertRow key={a.id} alert={a} />)}
             </div>
           </CardShell>
@@ -268,22 +297,12 @@ function Reading({ label, value, unit, sub, warn, icon, last }) {
   );
 }
 
-function SaleRow({ caption, sub, summary, total }) {
+function KontrolRow({ label, value, on }) {
+  const tone = on === true ? 'text-normal-teks' : on === false ? 'text-tinta-40' : 'text-tinta';
   return (
-    <div className={`flex items-center justify-between px-4 py-[14px] rounded-md border ${total ? 'bg-olive-lembut border-[#D2DCCC]' : 'bg-permukaan border-border'}`}>
-      <div className="text-[13px] text-tinta-60">
-        <b className="block text-[14px] text-tinta font-semibold mb-[2px]">{caption}</b>
-        {sub}
-      </div>
-      <div className="text-right">
-        <div className="font-body font-bold text-[22px] tnum leading-none">
-          {formatAngka(summary?.total_liter)}
-          <small className="text-[13px] text-tinta-60 font-semibold"> liter</small>
-        </div>
-        <div className="text-[13px] text-tinta-60 mt-[5px] tnum">
-          ≈ <b className="text-amber-teks font-semibold">{formatRupiah(summary?.total_pendapatan)}</b>
-        </div>
-      </div>
+    <div className="flex items-center justify-between gap-3 px-4 py-[11px] rounded-md border border-border bg-permukaan">
+      <span className="text-[13px] text-tinta-60">{label}</span>
+      <b className={`text-[14px] font-semibold tnum ${tone}`}>{value}</b>
     </div>
   );
 }

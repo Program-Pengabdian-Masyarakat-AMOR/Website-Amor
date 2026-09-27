@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth } from '../middleware/auth.js';
+import { allow } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/error.js';
 import { saleDTO } from '../lib/serializers.js';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(allow('management'));
 
 // GET /api/sales/summary?dari&sampai  (didefinisikan sebelum /:id agar tak bentrok)
 router.get(

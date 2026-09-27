@@ -26,11 +26,18 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  console.log('[socket] klien terhubung:', socket.id, `(${socket.user?.username})`);
+  const role = socket.user?.role;
+  if (role) socket.join(`role:${role}`);
+
+  // Telemetri mesin hanya untuk admin/operator. Management tetap login, tetapi tidak
+  // otomatis menerima event sensor/health/control yang sensitif.
+  if (role === 'admin' || role === 'operator') socket.join('telemetry');
+
+  console.log('[socket] klien terhubung:', socket.id, `(${socket.user?.username}/${role || 'unknown'})`);
   socket.on('disconnect', () => console.log('[socket] klien putus:', socket.id));
 });
 
-// Jembatan Firebase → emit 'sensor-update' & 'health-update' ke semua klien.
+// Jembatan Firebase → emit realtime ke room sesuai role.
 initBridge(io);
 warmupAiEngine().catch((e) => console.error('[ai] warmup gagal:', e.message));
 

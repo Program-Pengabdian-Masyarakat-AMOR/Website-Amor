@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 //   const { toast, toastProps } = useToast();
 //   toast('Tersimpan.');  ... <Toast {...toastProps} />
 export function useToast() {
-  const [state, setState] = useState({ message: '', show: false });
+  const [state, setState] = useState({ message: '', show: false, variant: 'success' });
 
-  const toast = useCallback((message) => setState({ message, show: true }), []);
+  const toast = useCallback((message, variant = 'success') => setState({ message, show: true, variant }), []);
   const hide = useCallback(() => setState((s) => ({ ...s, show: false })), []);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 // Toast terkontrol. Hook pendamping ada di hooks/useToast.js.
-export default function Toast({ message, show }) {
+export default function Toast({ message, show, variant = 'success' }) {
+  const tone = variant === 'error' ? 'text-critical' : variant === 'warning' ? 'text-warning' : 'text-[#8FC489]';
   return (
     <div
       className={`fixed bottom-[26px] left-1/2 -translate-x-1/2 z-[200] flex items-center gap-[10px] bg-tinta text-[#F4F0E9] text-[14px] font-medium px-5 py-[13px] rounded-md shadow-2 transition-all duration-200 ${
@@ -8,8 +9,16 @@ export default function Toast({ message, show }) {
       role="status"
       aria-live="polite"
     >
-      <svg viewBox="0 0 24 24" className="w-[17px] h-[17px] text-[#8FC489]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m20 6-11 11-5-5" />
+      <svg viewBox="0 0 24 24" className={`w-[17px] h-[17px] ${tone}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        {variant === 'success' ? (
+          <path d="m20 6-11 11-5-5" />
+        ) : (
+          <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v5" />
+            <path d="M12 16h.01" />
+          </>
+        )}
       </svg>
       <span>{message}</span>
     </div>

@@ -66,22 +66,23 @@ export default function MonitoringLog() {
   const sesi = produksi.data?.[0];
   const proses = current?.status_sistem || 'idle';
 
-  // Timer proses sisi-web (mulai saat status jadi running; tidak dari Firebase).
+  // Timer proses. Titik awal diambil dari waktu mulai sesi yang dicatat server
+  // (session_started_at), sehingga timer tidak kembali ke 00:00 saat halaman di-refresh.
+  // Fallback ke jam browser hanya bila server belum mengirim waktu mulai.
+  const sessionStartedAt = current?.session_started_at ? new Date(current.session_started_at).getTime() : null;
   useEffect(() => {
-    if (proses === 'running') {
-      if (startRef.current == null) startRef.current = Date.now();
-    } else {
+    if (proses !== 'running') {
       startRef.current = null;
       setElapsedMs(0);
+      return;
     }
-  }, [proses]);
-  useEffect(() => {
-    if (proses !== 'running') return;
-    const id = setInterval(() => {
-      if (startRef.current != null) setElapsedMs(Date.now() - startRef.current);
-    }, 1000);
+    if (Number.isFinite(sessionStartedAt)) startRef.current = sessionStartedAt;
+    else if (startRef.current == null) startRef.current = Date.now();
+    const tick = () => setElapsedMs(Math.max(0, Date.now() - startRef.current));
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [proses]);
+  }, [proses, sessionStartedAt]);
   const sp = kontrol.data;
 
   const gasTerdeteksi = current?.status_gas === true;

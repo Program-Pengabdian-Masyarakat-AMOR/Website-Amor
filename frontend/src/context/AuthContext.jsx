@@ -30,10 +30,10 @@ export function AuthProvider({ children }) {
       const data = await api.post('/auth/login', { username: usernameInput, password });
       setToken(data.token);
       localStorage.setItem(ROLE_KEY, data.role);
-      localStorage.setItem(USER_KEY, usernameInput);
+      localStorage.setItem(USER_KEY, data.username || usernameInput);
       setTokenState(data.token);
       setRole(data.role);
-      setUsername(usernameInput);
+      setUsername(data.username || usernameInput);
       return data;
     } finally {
       setLoading(false);

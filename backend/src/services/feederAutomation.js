@@ -84,7 +84,7 @@ export async function setFeederAutomationMode(next) {
     await move(false, { source: 'ai', reason: `mode feeder ${previousMode} -> ${mode}` });
   }
   const status = getFeederAutomationStatus();
-  if (ioRef) ioRef.emit('ai-feeder-mode', status);
+  if (ioRef) ioRef.to('telemetry').emit('ai-feeder-mode', status);
   return status;
 }
 
@@ -144,7 +144,7 @@ function emitDecision(decision) {
       tungku: { ...control.tungku, target: bandCenter(control.tungku) },
     } : null,
   };
-  if (ioRef) ioRef.emit('ai-feeder-decision', lastDecision);
+  if (ioRef) ioRef.to('telemetry').emit('ai-feeder-decision', lastDecision);
 }
 
 function pushTrendSample(t) {

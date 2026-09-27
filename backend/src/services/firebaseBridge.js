@@ -31,6 +31,19 @@ let prevStatus = null;
 let monitoring = {};
 let activeSession = null;
 
+// Status koneksi untuk halaman health check admin.
+const bridgeState = {
+  mode: 'off', // firebase | simulator | off
+  connected: false,
+  lastConnectedAt: null,
+  lastDisconnectedAt: null,
+  lastMonitoringAt: null,
+  lastInputAt: null,
+  lastWriteAt: null,
+  lastWriteError: null,
+  startedAt: new Date().toISOString(),
+};
+
 const num = (v) => (v == null || Number.isNaN(Number(v)) ? 0 : Number(v));
 const firstFinite = (...values) => {
   for (const value of values) {
@@ -61,6 +74,8 @@ function buildTelemetry() {
     // Field baru bersifat additive; FE lama aman mengabaikannya.
     predicted_yield_live: activeSession?.livePrediction?.predictedYield ?? null,
     session_id_live: activeSession?.sessionId ?? null,
+    // Waktu mulai sesi dari server, agar timer proses di web tidak reset saat halaman di-refresh.
+    session_started_at: activeSession?.startedAt ? new Date(activeSession.startedAt).toISOString() : null,
   };
 }
 
@@ -79,6 +94,24 @@ function buildHealth(t) {
     keterangan: alerts.length ? alerts.map((a) => a.pesan).join('; ') : 'Semua parameter dalam batas aman.',
     created_at: new Date().toISOString(),
   };
+}
+
+
+function emitTelemetry(event, payload) {
+  // Hanya admin/operator yang bergabung ke room telemetry di src/index.js.
+  if (ioRef) ioRef.to('telemetry').emit(event, payload);
+}
+
+function emitAdmin(event, payload) {
+  if (ioRef) ioRef.to('role:admin').emit(event, payload);
+}
+
+function emitControlUpdate() {
+  emitTelemetry('control-update', getControl());
+}
+
+function emitFirebaseStatus() {
+  emitAdmin('firebase-connection', getBridgeStatus());
 }
 
 let pushTimer = null;
@@ -108,6 +141,7 @@ function startSession(t) {
     lastPredictionAt: 0,
   };
   console.log('[bridge] sesi mulai:', activeSession.sessionId);
+  if (latest) latest = { ...latest, session_id_live: activeSession.sessionId, session_started_at: new Date(activeSession.startedAt).toISOString() };
   updateSessionStats(t);
 }
 
@@ -176,7 +210,7 @@ function updateSessionStats(t) {
       if (!activeSession || activeSession.sessionId !== predictionSessionId) return;
       activeSession.livePrediction = prediction;
       latest = latest ? { ...latest, predicted_yield_live: prediction.predictedYield, session_id_live: activeSession.sessionId } : latest;
-      if (ioRef) ioRef.emit('yield-prediction', {
+      emitTelemetry('yield-prediction', {
         session_id: activeSession.sessionId,
         predicted_yield: prediction.predictedYield,
         engine: prediction.engine,
@@ -309,10 +343,8 @@ function push(t) {
   acc.berat += t.berat_sampah;
   acc.n += 1;
 
-  if (ioRef) {
-    ioRef.emit('sensor-update', t);
-    ioRef.emit('health-update', buildHealth(t));
-  }
+  emitTelemetry('sensor-update', t);
+  emitTelemetry('health-update', buildHealth(t));
 
   handleSessionState(t).catch((e) => console.error('[bridge] state sesi gagal:', e.message));
   evaluateFeederTelemetry(t).catch((e) => console.error('[ai-feeder] evaluasi gagal:', e.message));
@@ -329,7 +361,7 @@ function flushMinuteLog() {
   minuteSeries.push(point);
   if (minuteSeries.length > MAX_LOG) minuteSeries.shift();
   acc = { pir: 0, tun: 0, berat: 0, n: 0 };
-  if (ioRef) ioRef.emit('temp-log', point);
+  emitTelemetry('temp-log', point);
 }
 
 function inputToControl(input) {
@@ -346,6 +378,40 @@ function inputToControl(input) {
     blower: Boolean(input?.blower ?? input?.kontrol?.blower),
     feeder: Boolean(input?.feeder ?? input?.kontrol?.feeder),
     alarm: input?.alarm !== false,
+  };
+}
+
+async function writeInput(patch) {
+  try {
+    await db.ref('input').update(patch);
+    bridgeState.lastWriteAt = new Date().toISOString();
+    bridgeState.lastWriteError = null;
+  } catch (e) {
+    bridgeState.lastWriteError = e.message;
+    throw e;
+  }
+}
+
+/** Ringkasan koneksi Firebase + socket untuk health check admin. */
+export function getBridgeStatus() {
+  const age = (iso) => (iso ? Math.round((Date.now() - new Date(iso).getTime()) / 1000) : null);
+  return {
+    configured: Boolean(db),
+    mode: bridgeState.mode,
+    connected: bridgeState.mode === 'simulator' ? true : bridgeState.connected,
+    last_connected_at: bridgeState.lastConnectedAt,
+    last_disconnected_at: bridgeState.lastDisconnectedAt,
+    last_monitoring_at: bridgeState.lastMonitoringAt,
+    last_monitoring_age_s: age(bridgeState.lastMonitoringAt),
+    last_input_at: bridgeState.lastInputAt,
+    last_write_at: bridgeState.lastWriteAt,
+    last_write_error: bridgeState.lastWriteError,
+    bridge_started_at: bridgeState.startedAt,
+    socket_clients: ioRef?.engine?.clientsCount ?? 0,
+    minute_points: minuteSeries.length,
+    active_session: activeSession
+      ? { session_id: activeSession.sessionId, started_at: new Date(activeSession.startedAt).toISOString(), samples: activeSession.n }
+      : null,
   };
 }
 
@@ -366,7 +432,7 @@ export async function setSetpoint({ pirolisis, tungku }) {
   if (pirolisis) control.pirolisis = { ...control.pirolisis, ...pirolisis };
   if (tungku) control.tungku = { ...control.tungku, ...tungku };
   if (db) {
-    await db.ref('input').update({
+    await writeInput({
       pirolisis_bawah: control.pirolisis.bawah,
       pirolisis_atas: control.pirolisis.atas,
       tungku_bawah: control.tungku.bawah,
@@ -378,6 +444,7 @@ export async function setSetpoint({ pirolisis, tungku }) {
   if (latest) {
     await reevaluateFeederTelemetry(latest).catch((e) => console.error('[ai-feeder] reevaluasi setpoint gagal:', e.message));
   }
+  emitControlUpdate();
   return getControl();
 }
 
@@ -385,7 +452,7 @@ async function applyFeederState(value, { source = 'manual', reason = 'perintah o
   const desired = Boolean(value);
   if (control.feeder === desired) return getControl();
   control.feeder = desired;
-  if (db) await db.ref('input').update({ feeder: desired });
+  if (db) await writeInput({ feeder: desired });
 
   const t = telemetry || getLatestTelemetry();
   try {
@@ -411,11 +478,12 @@ async function applyFeederState(value, { source = 'manual', reason = 'perintah o
       ai_score: log.aiScore,
       created_at: log.createdAt,
     };
-    if (ioRef) ioRef.emit('feeder-movement', dto);
+    emitTelemetry('feeder-movement', dto);
     console.log(`[feeder] ${desired ? 'ON' : 'OFF'} (${source}) — ${reason}`);
   } catch (e) {
     console.error('[feeder] state berubah tetapi log DB gagal:', e.message);
   }
+  emitControlUpdate();
   return getControl();
 }
 
@@ -430,8 +498,9 @@ export async function setKontrol({ blower, feeder, alarm }) {
     const patch = {};
     if (typeof blower === 'boolean') patch.blower = control.blower;
     if (typeof alarm === 'boolean') patch.alarm = control.alarm;
-    if (Object.keys(patch).length) await db.ref('input').update(patch);
+    if (Object.keys(patch).length) await writeInput(patch);
   }
+  emitControlUpdate();
   return getControl();
 }
 
@@ -454,15 +523,29 @@ export function initBridge(io) {
     console.warn(
       '[bridge] Firebase off — menjalankan simulator telemetri khusus development.'
     );
+    bridgeState.mode = 'simulator';
+    bridgeState.connected = true;
+    bridgeState.lastConnectedAt = new Date().toISOString();
     startSimulator();
     return;
   }
   
+  bridgeState.mode = 'firebase';
+  // Node khusus RTDB: true saat klien benar-benar tersambung ke server Firebase.
+  db.ref('.info/connected').on('value', (snap) => {
+    const now = new Date().toISOString();
+    bridgeState.connected = snap.val() === true;
+    if (bridgeState.connected) bridgeState.lastConnectedAt = now;
+    else bridgeState.lastDisconnectedAt = now;
+    console.log(`[bridge] Firebase ${bridgeState.connected ? 'tersambung' : 'terputus'}.`);
+    emitFirebaseStatus();
+  });
+
   db.ref('input').get().then(async (snap) => {
     const raw = snap.val() || {};
     control = inputToControl(raw);
     if (raw.pirolisis || raw.tungku || raw.kontrol) {
-      await db.ref('input').update({
+      await writeInput({
         pirolisis_bawah: control.pirolisis.bawah,
         pirolisis_atas: control.pirolisis.atas,
         tungku_bawah: control.tungku.bawah,
@@ -476,10 +559,13 @@ export function initBridge(io) {
   });
   db.ref('input').on('value', (snap) => {
     control = inputToControl(snap.val());
+    bridgeState.lastInputAt = new Date().toISOString();
+    emitControlUpdate();
   });
 
   db.ref('monitoring').on('value', (snap) => {
     monitoring = snap.val() || {};
+    bridgeState.lastMonitoringAt = new Date().toISOString();
     schedulePush();
   });
 
@@ -510,6 +596,7 @@ function startSimulator() {
       status_sistem: 'PROCESS',
     };
     // Simulator sengaja tidak FINISH otomatis agar tidak membanjiri DB saat dev.
+    bridgeState.lastMonitoringAt = new Date().toISOString();
     schedulePush();
   }, 3000);
 }

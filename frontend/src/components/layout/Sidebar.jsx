@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { LOGIN_PATH, NAV, roleLabel } from '../../lib/roles';
 
 // Ikon di-port dari prototype (Dashboard.html sidebar).
 const icons = {
@@ -51,19 +52,25 @@ const icons = {
       <circle cx="9.5" cy="9" r="0.5" fill="currentColor" />
     </svg>
   ),
+  rekap: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+      <path d="M4 11v6c0 1.7 3.6 3 8 3" />
+      <path d="M18 15v6M15 18l3 3 3-3" />
+    </svg>
+  ),
+  konten: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M8 14h3M8 17h6" />
+    </svg>
+  ),
 };
 
-const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: icons.dashboard, end: true },
-  { to: '/dashboard/monitoring', label: 'Monitoring & Log', icon: icons.monitoring },
-  { to: '/dashboard/kontrol', label: 'Kontrol', icon: icons.kontrol },
-  { to: '/dashboard/health', label: 'Health Check', icon: icons.health, count: 2 },
-  { to: '/dashboard/members', label: 'Anggota', icon: icons.members },
-  { to: '/dashboard/sales', label: 'Penjualan', icon: icons.sales },
-];
-
 function inisial(nama) {
-  if (!nama) return 'OP';
+  if (!nama) return 'AM';
   return nama.slice(0, 2).toUpperCase();
 }
 
@@ -72,11 +79,12 @@ function inisial(nama) {
 export default function Sidebar({ onNavigate, onClose }) {
   const { username, role, logout } = useAuth();
   const navigate = useNavigate();
+  const menu = NAV[role] || [];
 
   function handleLogout() {
     logout();
     onNavigate?.();
-    navigate('/login', { replace: true });
+    navigate(LOGIN_PATH, { replace: true });
   }
 
   const linkClass = ({ isActive }) =>
@@ -112,9 +120,9 @@ export default function Sidebar({ onNavigate, onClose }) {
 
       <nav className="flex flex-col gap-[3px] px-[14px] py-2">
         <span className="text-[10.5px] tracking-[.12em] uppercase text-tinta-40 font-semibold px-[10px] pt-[14px] pb-[6px]">
-          Menu
+          Menu {roleLabel(role)}
         </span>
-        {NAV.map((item) => (
+        {menu.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} onClick={() => onNavigate?.()} className={linkClass}>
             {({ isActive }) => (
               <>
@@ -122,14 +130,9 @@ export default function Sidebar({ onNavigate, onClose }) {
                   <span className="absolute -left-[14px] top-[9px] bottom-[9px] w-[3px] rounded-r-[3px] bg-amber-tombol" />
                 )}
                 <span className="w-[19px] h-[19px] [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-[1.7]">
-                  {item.icon}
+                  {icons[item.icon]}
                 </span>
                 {item.label}
-                {item.count != null && (
-                  <span className="ml-auto text-[11.5px] font-bold bg-critical text-white rounded-full px-[7px] py-px">
-                    {item.count}
-                  </span>
-                )}
               </>
             )}
           </NavLink>
@@ -142,7 +145,7 @@ export default function Sidebar({ onNavigate, onClose }) {
         </div>
         <div className="min-w-0">
           <b className="block text-[13.5px] font-semibold truncate">{username || 'Pengguna'}</b>
-          <span className="text-[12px] text-tinta-40 capitalize">{role || 'operator'}</span>
+          <span className="text-[12px] text-tinta-40">{roleLabel(role)}</span>
         </div>
         <button
           type="button"

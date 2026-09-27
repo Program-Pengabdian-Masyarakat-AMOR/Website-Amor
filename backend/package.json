@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:studio": "prisma studio",
     "seed": "node src/seed.js",
+    "user:create": "node scripts/create-user.js",
     "prisma:deploy": "prisma migrate deploy",
     "ai:data": "python ../ai/run_all_generators.py",
     "ai:train": "python ../ai/scripts/train_all.py",

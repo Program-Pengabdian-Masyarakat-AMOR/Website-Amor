@@ -139,8 +139,8 @@ export default function Kontrol() {
 
   function requestAiMode(next) {
     if (next === aiFeeder?.mode || switchingAi) return;
-    if (role !== 'admin') {
-      toast('Hanya admin yang dapat mengubah mode AI feeder.');
+    if (role !== 'operator') {
+      toast('Hanya operator yang dapat mengubah mode AI feeder.');
       return;
     }
     if (next === 'auto') {
@@ -231,7 +231,7 @@ export default function Kontrol() {
                         <button
                           key={m.key}
                           type="button"
-                          disabled={switchingAi || (role !== 'admin' && !active)}
+                          disabled={switchingAi || (role !== 'operator' && !active)}
                           onClick={() => requestAiMode(m.key)}
                           className={`text-left border rounded-md px-4 py-[14px] transition disabled:opacity-55 ${
                             active
@@ -253,9 +253,9 @@ export default function Kontrol() {
                     setpoint masih berada dalam envelope model, cooldown selesai, dan tidak ada manual override.
                     ONNX memberi probabilitas feed; lightweight MPC memproyeksikan tren suhu lalu memilih HOLD, ½ pulse, atau full pulse.
                   </div>
-                  {role !== 'admin' && (
+                  {role !== 'operator' && (
                     <div className="mt-3 text-[12.5px] text-amber-teks bg-amber-lembut border border-[#EAC9AE] rounded-md px-3 py-2">
-                      Mode terlihat untuk operator, tetapi perubahan OFF / OBSERVE / AUTO hanya dapat dilakukan admin.
+                      Perubahan OFF / OBSERVE / AUTO hanya dapat dilakukan operator.
                     </div>
                   )}
                 </div>

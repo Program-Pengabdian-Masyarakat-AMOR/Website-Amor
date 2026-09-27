@@ -1,14 +1,12 @@
 import { useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const svg = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round', strokeLinejoin: 'round' };
 
 export default function Login() {
-  const { login, loading } = useAuth();
+  const { login, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const tujuan = location.state?.from?.pathname || '/dashboard';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -62,7 +60,7 @@ export default function Login() {
     clearAlert();
     try {
       await login(u, p);
-      navigate(tujuan, { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setAlert({ message: err.message || 'Gagal masuk. Coba lagi, ya.', variant: 'error' });
       triggerShake('pass');
@@ -76,6 +74,9 @@ export default function Login() {
       variant: 'warning',
     });
   }
+
+  // Sudah login → langsung ke dashboard sesuai role.
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const alertCls =
     alert?.variant === 'warning'
@@ -117,7 +118,7 @@ export default function Login() {
             </p>
             <h2 className="text-[30px] font-semibold mb-2">Masuk ke AMOR</h2>
             <p className="text-[15px] text-tinta-60">
-              Gunakan username dan kata sandi yang diberikan pengelola.
+              Gunakan username dan kata sandi yang diberikan pengelola. Role akun akan diperiksa otomatis oleh sistem.
             </p>
           </div>
 
@@ -155,7 +156,7 @@ export default function Login() {
                   ref={userRef}
                   type="text"
                   autoComplete="username"
-                  placeholder="mis. operator_rw04"
+                  placeholder="mis. admin / operator_rw04"
                   value={username}
                   onChange={(e) => { setUsername(e.target.value); clearAlert(); }}
                   className="field-input"
